@@ -49,6 +49,25 @@ def test_needs_review_when_totals_do_not_reconcile():
     assert "!=" in parsed.review_reason
 
 
+def test_needs_review_when_totals_mismatch_without_tip():
+    # No tip (common for retail/grocery) must still reconcile: tip is treated as 0.
+    ext = _good()
+    ext.tip = None
+    ext.total = 99.99  # subtotal+tax = 19.50
+    parsed = parse(ext)
+    assert parsed.status == ReceiptStatus.NEEDS_REVIEW
+    assert "!=" in parsed.review_reason
+
+
+def test_verified_without_tip_when_totals_match():
+    ext = _good()
+    ext.tip = None
+    ext.total = 19.5  # subtotal(18.0) + tax(1.5)
+    parsed = parse(ext)
+    assert parsed.status == ReceiptStatus.VERIFIED
+    assert parsed.review_reason is None
+
+
 def test_empty_line_items_flagged_for_review():
     # Blank descriptions are rejected by the schema validator, so this tests
     # the empty-list code path directly.

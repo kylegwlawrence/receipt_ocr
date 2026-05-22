@@ -99,14 +99,11 @@ def reconcile(parsed: ParsedReceipt) -> tuple[ReceiptStatus, str | None]:
     if not parsed.line_items:
         reasons.append("no line items")
 
-    # Totals consistency: only checkable when the parts and the total are all present.
-    if (
-        parsed.total is not None
-        and parsed.subtotal is not None
-        and parsed.tax is not None
-        and parsed.tip is not None
-    ):
-        expected = parsed.subtotal + parsed.tax + parsed.tip
+    # Totals consistency: checkable whenever subtotal and total are present.
+    # Missing tax/tip are treated as 0 so the check still runs for receipts
+    # without a tip (e.g. retail/grocery), which is the common case.
+    if parsed.total is not None and parsed.subtotal is not None:
+        expected = parsed.subtotal + (parsed.tax or 0.0) + (parsed.tip or 0.0)
         if abs(expected - parsed.total) > tol:
             reasons.append(
                 f"subtotal+tax+tip ({expected:.2f}) != total ({parsed.total:.2f})"
