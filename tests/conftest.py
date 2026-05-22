@@ -21,6 +21,7 @@ def engine():
 def session(engine):
     with Session(engine) as s:
         yield s
+        s.rollback()  # roll back any uncommitted state so tests don't leak into each other
 
 
 @pytest.fixture

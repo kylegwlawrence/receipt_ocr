@@ -20,6 +20,8 @@ def test_receipt_roundtrip(session):
     session.commit()
     session.refresh(receipt)
 
+    # expire_all forces SQLAlchemy to reload from DB rather than serving the identity-map cache.
+    session.expire_all()
     fetched = session.get(Receipt, receipt.id)
     assert fetched is not None
     assert fetched.merchant == "Corner Cafe"

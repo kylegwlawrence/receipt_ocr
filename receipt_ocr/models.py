@@ -2,6 +2,7 @@
 from datetime import date, datetime, timezone
 from enum import Enum
 
+from sqlalchemy import Column, DateTime
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -22,6 +23,7 @@ class Receipt(SQLModel, table=True):
     source_image_path: str
     image_sha256: str = Field(index=True, unique=True)
     merchant: str | None = None
+    # The parsing stage converts ReceiptExtraction.purchased_at (raw str) to date before loading.
     purchased_at: date | None = None
     subtotal: float | None = None
     tax: float | None = None
@@ -29,9 +31,16 @@ class Receipt(SQLModel, table=True):
     total: float | None = None
     status: ReceiptStatus = Field(default=ReceiptStatus.NEEDS_REVIEW)
     review_reason: str | None = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # DateTime(timezone=True) stores the UTC offset so the value roundtrips as tz-aware.
+    created_at: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        sa_column=Column(DateTime(timezone=True), nullable=False),
+    )
 
-    line_items: list["LineItem"] = Relationship(back_populates="receipt")
+    line_items: list["LineItem"] = Relationship(
+        back_populates="receipt",
+        sa_relationship_kwargs={"cascade": "all, delete-orphan"},
+    )
 
 
 class LineItem(SQLModel, table=True):
