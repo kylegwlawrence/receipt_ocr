@@ -1,0 +1,42 @@
+from datetime import date
+
+import pytest
+
+from receipt_ocr.loading import LoadVerificationError, persist, verify_write
+from receipt_ocr.models import Receipt, ReceiptStatus
+from receipt_ocr.parsing import ParsedLineItem, ParsedReceipt
+
+
+def _parsed() -> ParsedReceipt:
+    return ParsedReceipt(
+        merchant="Corner Cafe", purchased_at=date(2026, 5, 20),
+        subtotal=18.0, tax=1.5, tip=3.0, total=22.5,
+        line_items=[
+            ParsedLineItem("Latte", 2, 5.0, 10.0),
+            ParsedLineItem("Muffin", 1, 8.0, 8.0),
+        ],
+        status=ReceiptStatus.VERIFIED,
+        review_reason=None,
+    )
+
+
+def test_persist_writes_and_verifies(session):
+    rid = persist(session, _parsed(), "/tmp/r.jpg", "hash-1")
+    assert isinstance(rid, int)
+
+    row = session.get(Receipt, rid)
+    assert row is not None
+    assert row.merchant == "Corner Cafe"
+    assert row.status == ReceiptStatus.VERIFIED
+    assert len(row.line_items) == 2
+
+
+def test_verify_write_raises_on_count_mismatch(session):
+    rid = persist(session, _parsed(), "/tmp/r.jpg", "hash-2")
+    with pytest.raises(LoadVerificationError):
+        verify_write(session, rid, expected_line_items=99)
+
+
+def test_verify_write_raises_when_missing(session):
+    with pytest.raises(LoadVerificationError):
+        verify_write(session, receipt_id=123456, expected_line_items=0)
