@@ -5,7 +5,7 @@ store it in SQLite. Command-line tool; one image at a time.
 
 ## Requirements
 - Python 3.13 (a `.venv` is included)
-- Ollama running locally with a vision model pulled (default: `llama3.2-vision:11b`)
+- Ollama running locally with a vision model pulled (default: `qwen2.5vl:3b` — `ollama pull qwen2.5vl:3b`)
 
 ## Setup
 ```bash

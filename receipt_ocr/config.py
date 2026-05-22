@@ -15,7 +15,7 @@ class Settings:
             checking that subtotal + tax + tip equals the total.
     """
 
-    default_model: str = "llama3.2-vision:11b"
+    default_model: str = "qwen2.5vl:3b"
     default_db_path: str = "receipts.db"
     reconcile_tolerance: float = 0.01
 
