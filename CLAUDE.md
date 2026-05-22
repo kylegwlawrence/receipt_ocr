@@ -6,7 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Receipt OCR: read data from photos of receipts using a local vision model, transform it into tabular form, and store it in a database (SQLite to start). Full intent and scope live in `GOALS.md` (note: `GOALS.md` is gitignored).
 
-> **Status: greenfield.** The repo currently has no source code and no commits — only project goals and a Python virtualenv. Keep this file updated as the architecture takes shape.
+> **Status: v1 shipped.** The `receipt_ocr` package has one module per pipeline stage
+> (`ingestion`, `extraction`, `parsing`, `loading`) wired together by `pipeline.py` and exposed
+> as a CLI (`python -m receipt_ocr <image>`). Tests live under `tests/`. Keep this file updated as
+> the architecture evolves.
 
 ## Intended pipeline architecture
 
@@ -21,10 +24,17 @@ Out of scope for now: image submission via app/web page, an analytics dashboard,
 
 ## Environment
 
-- **Python 3.13** with a virtualenv at `.venv`. Activate with `source .venv/bin/activate`. Only `pip` is installed so far — no project dependencies or dependency manifest (`requirements.txt` / `pyproject.toml`) exist yet.
+- **Python 3.13** with a virtualenv at `.venv`. Activate with `source .venv/bin/activate`.
+  Dependencies live in `requirements.txt` (managed with `pip`, no `pyproject.toml`).
 - **Ollama** (local, `/usr/local/bin/ollama`) serves the vision model. Vision-capable models already pulled include `llama3.2-vision:11b` and `gemma3:12b`. Use `ollama list` to see what's available.
-- **SQLite** is the initial database target.
-- No test, lint, or build tooling is configured yet — establish it (and document the commands here) when adding the first code.
+- **SQLite** is the database target; it defaults to `receipts.db` (override with `--db-path`).
+
+### Commands
+- Install: `pip install -r requirements.txt`
+- Test: `pytest` (unit tests, model mocked); `pytest -m integration` for the real-model test
+- Run: `python -m receipt_ocr <image>` (options: `--db-path`, `--model`, `--verbose`)
+
+No lint or build tooling is configured yet.
 
 ## Conventions (from GOALS.md)
 
