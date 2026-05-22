@@ -51,6 +51,19 @@ def test_extract_raises_on_bad_json(tmp_path):
         extract(img, client=client)
 
 
+def test_extract_wraps_client_failure(tmp_path):
+    """A failing chat call (e.g. Ollama down) surfaces as ExtractionError."""
+    img = tmp_path / "r.jpg"
+    img.write_bytes(b"x")
+
+    class _BoomClient:
+        def chat(self, **kwargs):
+            raise ConnectionError("ollama server not reachable")
+
+    with pytest.raises(ExtractionError):
+        extract(img, client=_BoomClient())
+
+
 @pytest.mark.integration
 def test_extract_real_model(tmp_path):
     """Calls the real model. Run with: pytest -m integration

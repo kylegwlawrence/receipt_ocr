@@ -7,10 +7,9 @@ from pathlib import Path
 from typing import Literal
 
 from sqlalchemy.engine import Engine
-from sqlmodel import Session
 
 from receipt_ocr.config import settings
-from receipt_ocr.db import init_db, make_engine
+from receipt_ocr.db import get_session, init_db, make_engine
 from receipt_ocr.extraction import ExtractionError, extract
 from receipt_ocr.ingestion import ingest
 from receipt_ocr.loading import LoadVerificationError, persist
@@ -58,7 +57,7 @@ def run_pipeline(
     init_db(engine)
 
     try:
-        with Session(engine) as session:
+        with get_session(engine) as session:
             ingested = ingest(image_path, session)
             if ingested.is_duplicate:
                 logger.info("Duplicate image; skipping (existing id=%s)", ingested.existing_id)

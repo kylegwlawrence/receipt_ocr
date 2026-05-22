@@ -62,18 +62,24 @@ def extract(
 
     model_name = model or settings.default_model
 
-    response = client.chat(
-        model=model_name,
-        format=ReceiptExtraction.model_json_schema(),
-        messages=[
-            {
-                "role": "user",
-                "content": PROMPT,
-                "images": [str(image_path)],
-            }
-        ],
-        options={"temperature": 0},
-    )
+    # The chat call can fail before we ever see content: the Ollama server may be
+    # down, the model not pulled, etc. Translate those into ExtractionError so the
+    # pipeline reports a clean error instead of crashing with a raw traceback.
+    try:
+        response = client.chat(
+            model=model_name,
+            format=ReceiptExtraction.model_json_schema(),
+            messages=[
+                {
+                    "role": "user",
+                    "content": PROMPT,
+                    "images": [str(image_path)],
+                }
+            ],
+            options={"temperature": 0},
+        )
+    except Exception as exc:  # noqa: BLE001 - any client/transport failure is an extraction failure
+        raise ExtractionError(f"Vision model call failed: {exc}") from exc
 
     content = response.message.content
     try:

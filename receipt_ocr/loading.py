@@ -53,6 +53,9 @@ def verify_write(session: Session, receipt_id: int, expected_line_items: int) ->
     Raises:
         LoadVerificationError: If the row is missing or the line-item count differs.
     """
+    # Expire cached instances so session.get re-reads from the DB instead of
+    # returning the identity-map copy; otherwise this isn't a real read-back.
+    session.expire_all()
     fetched = session.get(Receipt, receipt_id)
     if fetched is None:
         raise LoadVerificationError(f"Receipt {receipt_id} not found after commit")

@@ -49,6 +49,19 @@ def test_pipeline_error_on_bad_extraction(tmp_path):
     assert result.outcome == "error"
 
 
+def test_pipeline_error_on_client_failure(tmp_path):
+    img = tmp_path / "r.jpg"
+    img.write_bytes(b"img-bytes")
+
+    class _BoomClient:
+        def chat(self, **kwargs):
+            raise ConnectionError("ollama server not reachable")
+
+    result = run_pipeline(img, engine=_engine(), client=_BoomClient())
+    assert result.outcome == "error"
+    assert "failed" in result.message.lower()
+
+
 def test_pipeline_needs_review_flagged(tmp_path):
     img = tmp_path / "r.jpg"
     img.write_bytes(b"img-bytes")
