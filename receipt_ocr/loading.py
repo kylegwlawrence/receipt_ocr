@@ -48,17 +48,20 @@ def to_models(
 
 
 def verify_write(session: Session, receipt_id: int, expected_line_items: int) -> bool:
-    """Re-read the receipt and confirm it persisted with the right line-item count.
+    """Read back the receipt within the current transaction and confirm the line-item count.
+
+    Called after flush (before commit) so that a mismatch raises *before* the data
+    is durably written — making the session rollback effective.
 
     Raises:
         LoadVerificationError: If the row is missing or the line-item count differs.
     """
-    # Expire cached instances so session.get re-reads from the DB instead of
-    # returning the identity-map copy; otherwise this isn't a real read-back.
+    # Expire the identity-map copy so session.get issues a real SELECT
+    # (reads the flushed-but-not-yet-committed row from the DB).
     session.expire_all()
     fetched = session.get(Receipt, receipt_id)
     if fetched is None:
-        raise LoadVerificationError(f"Receipt {receipt_id} not found after commit")
+        raise LoadVerificationError(f"Receipt {receipt_id} not found after flush")
     actual = len(fetched.line_items)
     if actual != expected_line_items:
         raise LoadVerificationError(
@@ -73,7 +76,12 @@ def persist(
     source_image_path: str,
     image_sha256: str,
 ) -> int:
-    """Insert the receipt + line items, commit, and verify the write.
+    """Insert the receipt + line items, flush, verify, and return the new id.
+
+    Deliberately does NOT commit — the caller's session context (get_session) commits
+    on clean exit. Keeping flush-and-verify inside the same open transaction means a
+    failed verify raises before the data is durably written, so the rollback in
+    get_session's except branch is effective.
 
     Args:
         session: Active DB session.
@@ -89,7 +97,7 @@ def persist(
     """
     receipt = to_models(parsed, source_image_path, image_sha256)
     session.add(receipt)
-    session.commit()
-    session.refresh(receipt)
+    # flush sends the INSERT to the DB (assigns receipt.id) without committing.
+    session.flush()
     verify_write(session, receipt.id, len(parsed.line_items))
     return receipt.id

@@ -19,9 +19,11 @@ def engine():
 
 @pytest.fixture
 def session(engine):
+    # Test isolation comes from each test getting a fresh function-scoped in-memory
+    # engine, not from a teardown rollback. A rollback cannot undo data committed
+    # by persist() internally, so it would provide false safety if kept here.
     with Session(engine) as s:
         yield s
-        s.rollback()  # roll back any uncommitted state so tests don't leak into each other
 
 
 @pytest.fixture

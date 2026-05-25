@@ -79,6 +79,9 @@ def run_pipeline(
                 receipt_status=parsed.status,
                 review_reason=parsed.review_reason,
             )
-    except (ExtractionError, LoadVerificationError, FileNotFoundError, ValueError) as exc:
+    except Exception as exc:
+        # Catch everything (SQLAlchemy OperationalError/IntegrityError, unexpected
+        # runtime errors, etc.) so the pipeline always returns a clean result
+        # rather than crashing the caller with a raw traceback.
         logger.error("Pipeline failed: %s", exc)
         return PipelineResult(outcome="error", message=str(exc))
