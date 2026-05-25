@@ -7,7 +7,7 @@ from pathlib import Path
 
 from sqlmodel import Session, select
 
-from receipt_ocr.models import Receipt
+from app.models import Receipt
 
 # Common phone-camera formats. Extension check is a cheap sanity gate, not a
 # guarantee the bytes are a valid image (the model call is the real test).

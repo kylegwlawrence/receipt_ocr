@@ -5,13 +5,13 @@ import argparse
 import logging
 import sys
 
-from receipt_ocr.config import settings
-from receipt_ocr.pipeline import run_pipeline
+from app.config import settings
+from app.pipeline import run_pipeline
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="receipt_ocr",
+        prog="app",
         description="Read a receipt photo with a local vision model and store it in SQLite.",
     )
     parser.add_argument("image", help="Path to the receipt image.")

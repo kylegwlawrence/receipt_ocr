@@ -2,9 +2,9 @@ from datetime import date
 
 import pytest
 
-from receipt_ocr.loading import LoadVerificationError, persist, verify_write
-from receipt_ocr.models import Receipt, ReceiptStatus
-from receipt_ocr.parsing import ParsedLineItem, ParsedReceipt
+from app.loading import LoadVerificationError, persist, verify_write
+from app.models import Receipt, ReceiptStatus
+from app.parsing import ParsedLineItem, ParsedReceipt
 
 
 def _parsed() -> ParsedReceipt:

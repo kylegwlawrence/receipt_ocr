@@ -2,12 +2,12 @@ import hashlib
 
 import pytest
 
-from receipt_ocr.ingestion import (
+from app.ingestion import (
     compute_sha256,
     ingest,
     validate_image_path,
 )
-from receipt_ocr.models import Receipt, ReceiptStatus
+from app.models import Receipt, ReceiptStatus
 
 
 def _write_image(tmp_path, name="r.jpg", data=b"fake-image-bytes"):

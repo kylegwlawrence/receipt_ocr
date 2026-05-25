@@ -9,9 +9,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
-from receipt_ocr.config import settings
-from receipt_ocr.models import ReceiptStatus
-from receipt_ocr.schemas import LineItemExtraction, ReceiptExtraction
+from app.config import settings
+from app.models import ReceiptStatus
+from app.schemas import LineItemExtraction, ReceiptExtraction
 
 # Date formats we attempt, in order, after trying ISO.
 _DATE_FORMATS = (

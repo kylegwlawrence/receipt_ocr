@@ -9,7 +9,7 @@ from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine
 
 # Importing models registers the tables on SQLModel.metadata before create_all().
-from receipt_ocr import models  # noqa: F401
+from app import models  # noqa: F401
 
 
 def make_engine(db_path: str) -> Engine:

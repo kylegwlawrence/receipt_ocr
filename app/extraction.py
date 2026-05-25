@@ -10,8 +10,8 @@ from typing import Any, Protocol
 
 from pydantic import ValidationError
 
-from receipt_ocr.config import settings
-from receipt_ocr.schemas import ReceiptExtraction
+from app.config import settings
+from app.schemas import ReceiptExtraction
 
 PROMPT = (
     "You are reading a photo of a purchase receipt. Extract its data and return it as "

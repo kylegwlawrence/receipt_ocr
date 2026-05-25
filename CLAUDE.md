@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Receipt OCR: read data from photos of receipts using a local vision model, transform it into tabular form, and store it in a database (SQLite to start). Full intent and scope live in `GOALS.md` (note: `GOALS.md` is gitignored).
 
-> **Status: v1 shipped.** The `receipt_ocr` package has one module per pipeline stage
+> **Status: v1 shipped.** The `app` package has one module per pipeline stage
 > (`ingestion`, `extraction`, `parsing`, `loading`) wired together by `pipeline.py` and exposed
-> as a CLI (`python -m receipt_ocr <image>`). Tests live under `tests/`. Keep this file updated as
+> as a CLI (`python -m app <image>`). Tests live under `tests/`. Keep this file updated as
 > the architecture evolves.
 
 ## Intended pipeline architecture
@@ -32,7 +32,7 @@ Out of scope for now: image submission via app/web page, an analytics dashboard,
 ### Commands
 - Install: `pip install -r requirements.txt`
 - Test: `pytest` (unit tests, model mocked); `pytest -m integration` for the real-model test
-- Run: `python -m receipt_ocr <image>` (options: `--db-path`, `--model`, `--verbose`)
+- Run: `python -m app <image>` (options: `--db-path`, `--model`, `--verbose`)
 
 No lint or build tooling is configured yet.
 

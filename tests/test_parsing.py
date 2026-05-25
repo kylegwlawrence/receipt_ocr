@@ -1,8 +1,8 @@
 from datetime import date
 
-from receipt_ocr.models import ReceiptStatus
-from receipt_ocr.parsing import parse, parse_date, round_money
-from receipt_ocr.schemas import LineItemExtraction, ReceiptExtraction
+from app.models import ReceiptStatus
+from app.parsing import parse, parse_date, round_money
+from app.schemas import LineItemExtraction, ReceiptExtraction
 
 
 def _good() -> ReceiptExtraction:

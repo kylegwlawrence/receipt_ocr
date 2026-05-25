@@ -8,15 +8,15 @@ from typing import Literal
 
 from sqlalchemy.engine import Engine
 
-from receipt_ocr.config import settings
-from receipt_ocr.db import get_session, init_db, make_engine
-from receipt_ocr.extraction import ExtractionError, extract
-from receipt_ocr.ingestion import ingest
-from receipt_ocr.loading import LoadVerificationError, persist
-from receipt_ocr.models import ReceiptStatus
-from receipt_ocr.parsing import parse
+from app.config import settings
+from app.db import get_session, init_db, make_engine
+from app.extraction import ExtractionError, extract
+from app.ingestion import ingest
+from app.loading import LoadVerificationError, persist
+from app.models import ReceiptStatus
+from app.parsing import parse
 
-logger = logging.getLogger("receipt_ocr")
+logger = logging.getLogger("app")
 
 Outcome = Literal["loaded", "skipped_duplicate", "error"]
 

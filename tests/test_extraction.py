@@ -2,8 +2,8 @@ import types
 
 import pytest
 
-from receipt_ocr.extraction import ExtractionError, extract
-from receipt_ocr.schemas import ReceiptExtraction
+from app.extraction import ExtractionError, extract
+from app.schemas import ReceiptExtraction
 
 
 def _fake_response(content: str):

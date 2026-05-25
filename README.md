@@ -16,7 +16,7 @@ pip install -r requirements.txt
 ## Usage
 ```bash
 ollama serve                       # if it isn't already running
-python -m receipt_ocr path/to/receipt.jpg
+python -m app path/to/receipt.jpg
 ```
 Options: `--db-path PATH` (default `receipts.db`), `--model NAME`, `--verbose`.
 

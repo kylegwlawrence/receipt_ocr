@@ -3,7 +3,7 @@ import types
 from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel, create_engine
 
-from receipt_ocr.pipeline import run_pipeline
+from app.pipeline import run_pipeline
 
 
 def _engine():

@@ -2,8 +2,8 @@ import pytest
 from sqlalchemy.pool import StaticPool
 from sqlmodel import Session, SQLModel, create_engine
 
-from receipt_ocr import models  # noqa: F401  (register tables)
-from receipt_ocr.schemas import LineItemExtraction, ReceiptExtraction
+from app import models  # noqa: F401  (register tables)
+from app.schemas import LineItemExtraction, ReceiptExtraction
 
 
 @pytest.fixture

@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from sqlmodel import Session
 
-from receipt_ocr.models import LineItem, Receipt
-from receipt_ocr.parsing import ParsedReceipt
+from app.models import LineItem, Receipt
+from app.parsing import ParsedReceipt
 
 
 class LoadVerificationError(RuntimeError):

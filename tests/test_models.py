@@ -1,6 +1,6 @@
 from datetime import date
 
-from receipt_ocr.models import LineItem, Receipt, ReceiptStatus
+from app.models import LineItem, Receipt, ReceiptStatus
 
 
 def test_receipt_roundtrip(session):
