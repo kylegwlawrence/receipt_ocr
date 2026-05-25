@@ -6,10 +6,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Receipt OCR: read data from photos of receipts using a local vision model, transform it into tabular form, and store it in a database (SQLite to start). Full intent and scope live in `GOALS.md` (note: `GOALS.md` is gitignored).
 
-> **Status: v1 shipped.** The `app` package has one module per pipeline stage
-> (`ingestion`, `extraction`, `parsing`, `loading`) wired together by `pipeline.py` and exposed
-> as a CLI (`python -m app <image>`). Tests live under `tests/`. Keep this file updated as
-> the architecture evolves.
+> **Status: v1 shipped.** The `app` package contains the four pipeline stage modules
+> (`ingestion`, `extraction`, `parsing`, `loading`), plus supporting modules: `pipeline.py`
+> (orchestration), `cli.py` (CLI entry point), `config.py` (default settings), `db.py`
+> (SQLite engine/session helpers), `models.py` (SQLModel ORM tables), and `schemas.py`
+> (Pydantic extraction schemas). Exposed as a CLI via `python -m app <image>`. Tests live
+> under `tests/`. Keep this file updated as the architecture evolves.
 
 ## Intended pipeline architecture
 
@@ -26,7 +28,7 @@ Out of scope for now: image submission via app/web page, an analytics dashboard,
 
 - **Python 3.13** with a virtualenv at `.venv`. Activate with `source .venv/bin/activate`.
   Dependencies live in `requirements.txt` (managed with `pip`, no `pyproject.toml`).
-- **Ollama** (local, `/usr/local/bin/ollama`) serves the vision model. Vision-capable models already pulled include `llama3.2-vision:11b` and `gemma3:12b`. Use `ollama list` to see what's available.
+- **Ollama** (local, `/usr/local/bin/ollama`) serves the vision model. The current default model is `ministral-3:3b` (see `app/config.py`). Use `ollama list` to see what's available locally.
 - **SQLite** is the database target; it defaults to `receipts.db` (override with `--db-path`).
 
 ### Commands

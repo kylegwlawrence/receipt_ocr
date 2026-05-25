@@ -18,7 +18,7 @@ pip install -r requirements.txt
 ollama serve                       # if it isn't already running
 python -m app path/to/receipt.jpg
 ```
-Options: `--db-path PATH` (default `receipts.db`), `--model NAME`, `--verbose`.
+Options: `--db-path PATH` (default `receipts.db`), `--model NAME` (default `ministral-3:3b`), `--verbose`.
 
 ## Inspecting the data
 ```bash
@@ -35,4 +35,4 @@ pytest -m integration   # optional real-model test (needs Ollama + a sample imag
 ```
 
 ## How it works
-Ingestion → Extraction → Parsing → Loading. See `docs/plans/` for the full design.
+Ingestion → Extraction → Parsing → Loading. See `docs/plans/` for the full design and `docs/retros/` for phase retrospectives.
