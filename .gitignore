@@ -7,3 +7,10 @@ __pycache__/
 *.sqlite3
 data/
 /docs/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+.claude/
