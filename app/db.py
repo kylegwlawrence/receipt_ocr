@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
@@ -16,7 +17,9 @@ def make_engine(db_path: str) -> Engine:
     """Create a SQLite engine for the given file path.
 
     Also enables SQLite foreign-key enforcement, which is OFF by default.
+    Creates the parent directory if it does not exist.
     """
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     engine = create_engine(f"sqlite:///{db_path}", echo=False)
 
     @event.listens_for(engine, "connect")

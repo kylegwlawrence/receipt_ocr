@@ -16,7 +16,7 @@ class Settings:
     """
 
     default_model: str = "ministral-3:3b"
-    default_db_path: str = "receipts.db"
+    default_db_path: str = "data/receipts.db"
     reconcile_tolerance: float = 0.01
 
 
