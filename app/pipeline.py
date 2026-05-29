@@ -13,7 +13,7 @@ from app.db import get_session, init_db, make_engine
 from app.extraction import ExtractionError, extract
 from app.ingestion import ingest
 from app.loading import LoadVerificationError, persist
-from app.models import ReceiptStatus
+from app.models import Receipt, ReceiptStatus
 from app.parsing import parse
 
 logger = logging.getLogger("app")
@@ -39,6 +39,7 @@ def run_pipeline(
     model: str | None = None,
     engine: Engine | None = None,
     client=None,
+    force: bool = False,
 ) -> PipelineResult:
     """Run the full pipeline on a single receipt image.
 
@@ -49,6 +50,7 @@ def run_pipeline(
         model: Ollama model override; defaults to settings.default_model.
         engine: Pre-built engine (used by tests). When None, one is created from db_path.
         client: Ollama-like client override (used by tests). Passed to extraction.
+        force: When True, delete any existing receipt for this image and re-process it.
 
     Returns:
         A PipelineResult describing what happened.
@@ -60,12 +62,18 @@ def run_pipeline(
         with get_session(engine) as session:
             ingested = ingest(image_path, session)
             if ingested.is_duplicate:
-                logger.info("Duplicate image; skipping (existing id=%s)", ingested.existing_id)
-                return PipelineResult(
-                    outcome="skipped_duplicate",
-                    message=f"Already ingested as receipt {ingested.existing_id}",
-                    receipt_id=ingested.existing_id,
-                )
+                if not force:
+                    logger.info("Duplicate image; skipping (existing id=%s)", ingested.existing_id)
+                    return PipelineResult(
+                        outcome="skipped_duplicate",
+                        message=f"Already ingested as receipt {ingested.existing_id}",
+                        receipt_id=ingested.existing_id,
+                    )
+                existing = session.get(Receipt, ingested.existing_id)
+                if existing:
+                    logger.info("Force re-processing; deleting existing receipt id=%s", existing.id)
+                    session.delete(existing)
+                    session.flush()
 
             extraction = extract(ingested.path, model=model, client=client)
             parsed = parse(extraction)
