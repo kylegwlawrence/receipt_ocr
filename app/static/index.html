@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Receipt OCR Viewer</title>
+  <style>
+    :root {
+      --border: #d7dbe0;
+      --header-bg: #f3f5f7;
+      --accent: #2563eb;
+      --accent-soft: #e6efff;
+      --muted: #6b7280;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 24px;
+      color: #111827;
+      background: #fafbfc;
+    }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    h2 { font-size: 15px; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .subtitle { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+
+    .panel {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 20px;
+    }
+
+    /* Two-up layout: items table on the left, image on the right. */
+    .detail { display: flex; gap: 20px; align-items: flex-start; }
+    .detail > .panel { flex: 1; margin-bottom: 0; min-width: 0; }
+    .detail .image-panel { flex: 0 0 380px; }
+
+    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    th, td { border-bottom: 1px solid var(--border); padding: 7px 10px; text-align: left; white-space: nowrap; }
+    thead th { background: var(--header-bg); position: sticky; top: 0; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* Per-column filter inputs sit in a second header row. */
+    tr.filter-row th { padding: 4px 6px 8px; background: var(--header-bg); }
+    tr.filter-row input {
+      width: 100%; font-size: 12px; padding: 4px 6px;
+      border: 1px solid var(--border); border-radius: 4px;
+    }
+
+    .receipts-scroll { max-height: 320px; overflow: auto; }
+    tbody tr.receipt-row { cursor: pointer; }
+    tbody tr.receipt-row:hover { background: #f8fafc; }
+    tbody tr.receipt-row.selected { background: var(--accent-soft); }
+
+    .status-pill {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 11px; font-weight: 600;
+    }
+    .status-verified { background: #dcfce7; color: #166534; }
+    .status-needs_review { background: #fef3c7; color: #92400e; }
+
+    .image-panel img { width: 100%; border-radius: 6px; border: 1px solid var(--border); display: block; }
+    .empty { color: var(--muted); font-style: italic; padding: 12px 4px; }
+    .count { font-weight: 400; color: var(--muted); font-size: 12px; }
+
+    /* Upload control. */
+    .upload-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .upload-row input[type="file"] { font-size: 13px; }
+    button {
+      font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 6px;
+      border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
+    }
+    button:disabled { opacity: .55; cursor: default; }
+    .upload-status { font-size: 13px; }
+    .upload-status.working { color: var(--muted); }
+    .upload-status.ok { color: #166534; }
+    .upload-status.warn { color: #92400e; }
+    .upload-status.error { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <h1>Receipt OCR Viewer</h1>
+  <p class="subtitle">Type in any column header to filter. Click a receipt to see its items and photo.</p>
+
+  <div class="panel">
+    <h2>Add a Receipt</h2>
+    <div class="upload-row">
+      <input type="file" id="upload-input" accept="image/*" />
+      <button type="button" id="upload-button">Upload &amp; process</button>
+      <span class="upload-status" id="upload-status"></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>Receipts <span class="count" id="receipt-count"></span></h2>
+    <div class="receipts-scroll">
+      <table id="receipts-table">
+        <thead>
+          <tr>
+            <th data-key="id">#</th>
+            <th data-key="merchant">Merchant</th>
+            <th data-key="purchased_at">Date</th>
+            <th class="num" data-key="subtotal">Subtotal</th>
+            <th class="num" data-key="tax">Tax</th>
+            <th class="num" data-key="tip">Tip</th>
+            <th class="num" data-key="total">Total</th>
+            <th data-key="status">Status</th>
+          </tr>
+          <tr class="filter-row">
+            <th><input data-filter="id" placeholder="filter" /></th>
+            <th><input data-filter="merchant" placeholder="filter" /></th>
+            <th><input data-filter="purchased_at" placeholder="filter" /></th>
+            <th><input data-filter="subtotal" placeholder="filter" /></th>
+            <th><input data-filter="tax" placeholder="filter" /></th>
+            <th><input data-filter="tip" placeholder="filter" /></th>
+            <th><input data-filter="total" placeholder="filter" /></th>
+            <th><input data-filter="status" placeholder="filter" /></th>
+          </tr>
+        </thead>
+        <tbody id="receipts-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="detail">
+    <div class="panel">
+      <h2>Line Items <span class="count" id="items-subtitle"></span></h2>
+      <table id="items-table">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th class="num">Qty</th>
+            <th class="num">Unit Price</th>
+            <th class="num">Line Total</th>
+          </tr>
+        </thead>
+        <tbody id="items-body"></tbody>
+      </table>
+      <div class="empty" id="items-empty">Select a receipt above to see its line items.</div>
+    </div>
+
+    <div class="panel image-panel">
+      <h2>Receipt Image</h2>
+      <div id="image-container">
+        <div class="empty">Select a receipt above to see its photo.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---- Column display config -------------------------------------------
+    // Keys here must match the receipt fields returned by /api/receipts.
+    const COLUMNS = [
+      { key: "id" },
+      { key: "merchant" },
+      { key: "purchased_at" },
+      { key: "subtotal", money: true },
+      { key: "tax", money: true },
+      { key: "tip", money: true },
+      { key: "total", money: true },
+      { key: "status", status: true },
+    ];
+
+    let allReceipts = [];        // unfiltered data from the API
+    let selectedId = null;       // currently selected receipt id
+
+    const fmtMoney = (v) => (v === null || v === undefined) ? "" : Number(v).toFixed(2);
+    const display = (v) => (v === null || v === undefined) ? "" : String(v);
+
+    // ---- Receipts table rendering ----------------------------------------
+    function currentFilters() {
+      // Read each column filter input into { key: lowercased text }.
+      const filters = {};
+      document.querySelectorAll("input[data-filter]").forEach((el) => {
+        const text = el.value.trim().toLowerCase();
+        if (text) filters[el.dataset.filter] = text;
+      });
+      return filters;
+    }
+
+    function matchesFilters(receipt, filters) {
+      // A row matches when every active filter is a substring of that cell.
+      return Object.entries(filters).every(([key, text]) => {
+        const col = COLUMNS.find((c) => c.key === key);
+        const raw = receipt[key];
+        const cell = col && col.money ? fmtMoney(raw) : display(raw);
+        return cell.toLowerCase().includes(text);
+      });
+    }
+
+    function renderReceipts() {
+      const filters = currentFilters();
+      const rows = allReceipts.filter((r) => matchesFilters(r, filters));
+      const body = document.getElementById("receipts-body");
+      body.innerHTML = "";
+
+      for (const r of rows) {
+        const tr = document.createElement("tr");
+        tr.className = "receipt-row" + (r.id === selectedId ? " selected" : "");
+        tr.dataset.id = r.id;
+
+        for (const col of COLUMNS) {
+          const td = document.createElement("td");
+          if (col.status) {
+            const pill = document.createElement("span");
+            pill.className = "status-pill status-" + display(r.status);
+            pill.textContent = display(r.status).replace("_", " ");
+            td.appendChild(pill);
+          } else if (col.money) {
+            td.className = "num";
+            td.textContent = fmtMoney(r[col.key]);
+          } else {
+            td.textContent = display(r[col.key]);
+          }
+          tr.appendChild(td);
+        }
+
+        tr.addEventListener("click", () => selectReceipt(r.id));
+        body.appendChild(tr);
+      }
+
+      document.getElementById("receipt-count").textContent =
+        `(${rows.length} of ${allReceipts.length})`;
+    }
+
+    // ---- Detail (items + image) for the selected receipt -----------------
+    async function selectReceipt(id) {
+      selectedId = id;
+      renderReceipts();  // re-render to move the highlight
+
+      const receipt = allReceipts.find((r) => r.id === id);
+      const label = receipt && receipt.merchant ? receipt.merchant : `Receipt #${id}`;
+      document.getElementById("items-subtitle").textContent = `— ${label}`;
+
+      // Show the image first; the <img> loads independently of the items fetch.
+      const container = document.getElementById("image-container");
+      container.innerHTML =
+        `<img src="/api/receipts/${id}/image" alt="Receipt ${id}" ` +
+        `onerror="this.replaceWith(Object.assign(document.createElement('div'),` +
+        `{className:'empty',textContent:'Image file not found.'}))" />`;
+
+      // Load the line items.
+      const itemsBody = document.getElementById("items-body");
+      const itemsEmpty = document.getElementById("items-empty");
+      try {
+        const items = await fetch(`/api/receipts/${id}/items`).then((res) => res.json());
+        itemsBody.innerHTML = "";
+        if (!items.length) {
+          itemsEmpty.textContent = "This receipt has no line items.";
+          itemsEmpty.style.display = "block";
+          return;
+        }
+        itemsEmpty.style.display = "none";
+        for (const it of items) {
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            `<td>${display(it.description)}</td>` +
+            `<td class="num">${display(it.quantity)}</td>` +
+            `<td class="num">${fmtMoney(it.unit_price)}</td>` +
+            `<td class="num">${fmtMoney(it.line_total)}</td>`;
+          itemsBody.appendChild(tr);
+        }
+      } catch (err) {
+        itemsEmpty.textContent = "Failed to load line items.";
+        itemsEmpty.style.display = "block";
+      }
+    }
+
+    // ---- Data refresh ----------------------------------------------------
+    async function refresh(selectId) {
+      // Re-fetch all receipts and re-render. If selectId is given, open that
+      // receipt's detail (used right after an upload).
+      try {
+        allReceipts = await fetch("/api/receipts").then((res) => res.json());
+      } catch (err) {
+        document.getElementById("receipt-count").textContent = "(failed to load)";
+        return;
+      }
+      renderReceipts();
+      if (selectId) selectReceipt(selectId);
+    }
+
+    // ---- Upload ----------------------------------------------------------
+    async function uploadReceipt() {
+      const input = document.getElementById("upload-input");
+      const button = document.getElementById("upload-button");
+      const status = document.getElementById("upload-status");
+      const file = input.files[0];
+      if (!file) {
+        status.textContent = "Choose an image first.";
+        status.className = "upload-status warn";
+        return;
+      }
+
+      button.disabled = true;
+      status.textContent = "Processing… the local model can take a few seconds.";
+      status.className = "upload-status working";
+
+      const form = new FormData();
+      form.append("file", file);
+      try {
+        const res = await fetch("/api/receipts", { method: "POST", body: form });
+        const data = await res.json();
+        if (!res.ok) {
+          status.textContent = data.detail || "Upload failed.";
+          status.className = "upload-status error";
+          return;
+        }
+        if (data.outcome === "skipped_duplicate") {
+          status.textContent = `Already ingested as receipt #${data.receipt_id}.`;
+          status.className = "upload-status warn";
+        } else {
+          status.textContent =
+            `Loaded receipt #${data.receipt_id} (${display(data.status).replace("_", " ")}).`;
+          status.className = "upload-status ok";
+        }
+        input.value = "";
+        await refresh(data.receipt_id);
+      } catch (err) {
+        status.textContent = "Upload failed.";
+        status.className = "upload-status error";
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    // ---- Wire-up ---------------------------------------------------------
+    document.querySelectorAll("input[data-filter]").forEach((el) => {
+      el.addEventListener("input", renderReceipts);
+    });
+    document.getElementById("upload-button").addEventListener("click", uploadReceipt);
+
+    refresh();
+  </script>
+</body>
+</html>

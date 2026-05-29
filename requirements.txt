@@ -1,4 +1,7 @@
 ollama
 pydantic
 sqlmodel
+fastapi
+uvicorn
+python-multipart
 pytest
