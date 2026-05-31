@@ -210,6 +210,35 @@ async def upload_receipt(file: UploadFile = File(...)) -> dict:
     }
 
 
+@app.delete("/api/receipts/{receipt_id}")
+def delete_receipt(receipt_id: int) -> dict:
+    """Delete a receipt and its line items from the database.
+
+    The line items are removed automatically by the ORM cascade configured on
+    ``Receipt.line_items``. The original photo on disk is intentionally left in
+    place — deletion only affects the database, so no image files are ever
+    removed here.
+
+    Args:
+        receipt_id: Primary key of the receipt to delete.
+
+    Returns:
+        A dict echoing the deleted id, e.g. ``{"deleted": 3}``.
+
+    Raises:
+        HTTPException: 404 if no receipt with that id exists.
+    """
+    with get_session(engine) as session:
+        receipt = session.get(Receipt, receipt_id)
+        if receipt is None:
+            raise HTTPException(status_code=404, detail="Receipt not found")
+        # The session context manager commits the delete (and its line-item
+        # cascade) on clean exit.
+        session.delete(receipt)
+
+    return {"deleted": receipt_id}
+
+
 # Mount the static viewer last so the API routes above take precedence. html=True
 # makes "/" serve index.html.
 app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")

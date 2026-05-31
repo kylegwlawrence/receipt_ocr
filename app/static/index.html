@@ -73,6 +73,14 @@
       border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
     }
     button:disabled { opacity: .55; cursor: default; }
+
+    /* Per-row delete button, pinned to the right end of each receipt row. */
+    td.actions, th.actions { text-align: right; }
+    .delete-btn {
+      font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 5px;
+      border: 1px solid #fca5a5; background: #fff; color: #b91c1c; cursor: pointer;
+    }
+    .delete-btn:hover { background: #fee2e2; }
     .upload-status { font-size: 13px; }
     .upload-status.working { color: var(--muted); }
     .upload-status.ok { color: #166534; }
@@ -107,6 +115,7 @@
             <th class="num" data-key="tip">Tip</th>
             <th class="num" data-key="total">Total</th>
             <th data-key="status">Status</th>
+            <th class="actions"></th>
           </tr>
           <tr class="filter-row">
             <th><input data-filter="id" placeholder="filter" /></th>
@@ -117,6 +126,7 @@
             <th><input data-filter="tip" placeholder="filter" /></th>
             <th><input data-filter="total" placeholder="filter" /></th>
             <th><input data-filter="status" placeholder="filter" /></th>
+            <th class="actions"></th>
           </tr>
         </thead>
         <tbody id="receipts-body"></tbody>
@@ -217,6 +227,21 @@
           tr.appendChild(td);
         }
 
+        // Delete button at the right end of the row. stopPropagation keeps a
+        // click on it from also selecting (opening) the row.
+        const actionTd = document.createElement("td");
+        actionTd.className = "actions";
+        const delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "delete-btn";
+        delBtn.textContent = "Delete";
+        delBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          deleteReceipt(r);
+        });
+        actionTd.appendChild(delBtn);
+        tr.appendChild(actionTd);
+
         tr.addEventListener("click", () => selectReceipt(r.id));
         body.appendChild(tr);
       }
@@ -265,6 +290,43 @@
       } catch (err) {
         itemsEmpty.textContent = "Failed to load line items.";
         itemsEmpty.style.display = "block";
+      }
+    }
+
+    // ---- Delete ----------------------------------------------------------
+    function clearDetail() {
+      // Reset the detail panes (line items + image) to their initial state.
+      document.getElementById("items-subtitle").textContent = "";
+      document.getElementById("items-body").innerHTML = "";
+      const itemsEmpty = document.getElementById("items-empty");
+      itemsEmpty.textContent = "Select a receipt above to see its line items.";
+      itemsEmpty.style.display = "block";
+      document.getElementById("image-container").innerHTML =
+        '<div class="empty">Select a receipt above to see its photo.</div>';
+    }
+
+    async function deleteReceipt(receipt) {
+      // Confirm first (delete is irreversible), then DELETE via the API and
+      // refresh the table.
+      const label = receipt.merchant
+        ? `${receipt.merchant} (#${receipt.id})`
+        : `receipt #${receipt.id}`;
+      if (!confirm(`Delete ${label}? This cannot be undone.`)) return;
+      try {
+        const res = await fetch(`/api/receipts/${receipt.id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          alert(data.detail || "Delete failed.");
+          return;
+        }
+        // If the open receipt was the one deleted, clear the detail panes.
+        if (selectedId === receipt.id) {
+          selectedId = null;
+          clearDetail();
+        }
+        await refresh(selectedId);
+      } catch (err) {
+        alert("Delete failed.");
       }
     }
 
