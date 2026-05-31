@@ -15,3 +15,6 @@ images/
 !.env.example
 
 .claude/
+
+# macOS
+.DS_Store
