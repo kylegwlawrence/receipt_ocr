@@ -17,11 +17,12 @@ be overridden with the ``RECEIPTS_DB_PATH`` environment variable.
 """
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlmodel import select
@@ -31,6 +32,8 @@ from app.db import get_session, init_db, make_engine
 from app.ingestion import IMAGE_EXTENSIONS
 from app.models import LineItem, Receipt
 from app.pipeline import run_pipeline
+
+logger = logging.getLogger("app")
 
 # Project root (the directory that holds the ``app`` package). Relative paths in
 # the database (e.g. "images/receipt1.jpg") and the configured DB path are
@@ -61,6 +64,42 @@ init_db(engine)
 app = FastAPI(title="Receipt OCR Viewer")
 
 
+@app.get("/api/models")
+def list_models() -> dict:
+    """Return installed Ollama models that can read images (vision-capable).
+
+    Each model's capabilities are read via the Ollama ``show`` API; only models
+    whose capabilities include ``"vision"`` are returned, sorted by name. The
+    configured default is reported separately so the UI can pre-select it.
+
+    Returns:
+        ``{"models": [name, ...], "default": <default model name>}``. On any Ollama
+        error (server down, library missing) the list falls back to just the
+        configured default so the selector is never empty.
+    """
+    default = settings.default_model
+    try:
+        import ollama  # imported lazily; the server may run without Ollama present
+
+        vision: list[str] = []
+        for entry in ollama.list().models:
+            name = entry.model
+            try:
+                capabilities = ollama.show(name).capabilities or []
+            except Exception:  # noqa: BLE001 - skip a model we can't introspect
+                continue
+            if "vision" in capabilities:
+                vision.append(name)
+        vision.sort()
+        if not vision:
+            vision = [default]
+    except Exception as exc:  # noqa: BLE001 - any Ollama failure -> safe fallback
+        logger.warning("Could not list Ollama models: %s", exc)
+        vision = [default]
+
+    return {"models": vision, "default": default}
+
+
 @app.get("/api/receipts")
 def list_receipts() -> list[dict]:
     """Return every receipt header row, newest first.
@@ -77,6 +116,7 @@ def list_receipts() -> list[dict]:
             {
                 "id": r.id,
                 "merchant": r.merchant,
+                "model": r.model,
                 "purchased_at": r.purchased_at.isoformat() if r.purchased_at else None,
                 "subtotal": r.subtotal,
                 "tax": r.tax,
@@ -151,21 +191,25 @@ def get_image(receipt_id: int) -> FileResponse:
 
 
 @app.post("/api/receipts", status_code=201)
-async def upload_receipt(file: UploadFile = File(...)) -> dict:
+async def upload_receipt(
+    file: UploadFile = File(...),
+    model: str | None = Form(None),
+) -> dict:
     """Accept a receipt photo, run the pipeline on it, and return the outcome.
 
     The uploaded file is saved into the ``images/`` folder under a collision-proof
     name, then handed to :func:`app.pipeline.run_pipeline` synchronously (the local
-    vision model takes a few seconds). On a duplicate or error the saved file is
-    removed so ``images/`` only ever holds photos referenced by the database.
+    vision model takes a few seconds). On an error the saved file is removed so
+    ``images/`` only ever holds photos referenced by the database.
 
     Args:
         file: The multipart-uploaded image (jpg/png/webp/heic/...).
+        model: Ollama model to extract with. Defaults to settings.default_model
+            when omitted.
 
     Returns:
-        A dict describing what happened: ``outcome`` (loaded/skipped_duplicate),
-        ``message``, ``receipt_id``, and for loaded receipts ``status`` and
-        ``review_reason``.
+        A dict describing what happened: ``outcome``, ``message``, ``receipt_id``,
+        the ``model`` used, and for loaded receipts ``status`` and ``review_reason``.
 
     Raises:
         HTTPException: 400 for an unsupported/missing extension, 500 if the
@@ -192,7 +236,7 @@ async def upload_receipt(file: UploadFile = File(...)) -> dict:
     # Store a path relative to the project root so the DB stays portable and the
     # image endpoint's _resolve() can find it again.
     relative_path = dest.relative_to(PROJECT_ROOT)
-    result = run_pipeline(relative_path, engine=engine)
+    result = run_pipeline(relative_path, engine=engine, model=model)
 
     if result.outcome != "loaded":
         # Nothing in the DB references this file, so don't leave it on disk.
@@ -205,6 +249,7 @@ async def upload_receipt(file: UploadFile = File(...)) -> dict:
         "outcome": result.outcome,
         "message": result.message,
         "receipt_id": result.receipt_id,
+        "model": model or settings.default_model,
         "status": result.receipt_status.value if result.receipt_status else None,
         "review_reason": result.review_reason,
     }
