@@ -93,6 +93,14 @@
     .upload-status.ok { color: #166534; }
     .upload-status.warn { color: #92400e; }
     .upload-status.error { color: #b91c1c; }
+
+    /* Model selector in the upload row. */
+    .model-picker { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .model-picker label { font-size: 13px; color: var(--muted); }
+    .model-picker select {
+      font-size: 13px; padding: 7px 10px; border-radius: 6px;
+      border: 1px solid var(--border); background: #fff; color: #111827; cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -105,6 +113,10 @@
       <input type="file" id="upload-input" accept="image/*" />
       <button type="button" id="upload-button">Upload &amp; process</button>
       <span class="upload-status" id="upload-status"></span>
+      <span class="model-picker">
+        <label for="model-select">Model</label>
+        <select id="model-select"></select>
+      </span>
     </div>
   </div>
 
@@ -116,6 +128,7 @@
           <tr>
             <th data-key="id">#</th>
             <th data-key="merchant">Merchant</th>
+            <th data-key="model">Model</th>
             <th data-key="purchased_at">Date</th>
             <th class="num" data-key="subtotal">Subtotal</th>
             <th class="num" data-key="tax">Tax</th>
@@ -127,6 +140,7 @@
           <tr class="filter-row">
             <th><input data-filter="id" placeholder="filter" /></th>
             <th><input data-filter="merchant" placeholder="filter" /></th>
+            <th><input data-filter="model" placeholder="filter" /></th>
             <th><input data-filter="purchased_at" placeholder="filter" /></th>
             <th><input data-filter="subtotal" placeholder="filter" /></th>
             <th><input data-filter="tax" placeholder="filter" /></th>
@@ -172,6 +186,7 @@
     const COLUMNS = [
       { key: "id" },
       { key: "merchant" },
+      { key: "model" },
       { key: "purchased_at" },
       { key: "subtotal", money: true },
       { key: "tax", money: true },
@@ -360,6 +375,27 @@
       if (selectId) selectReceipt(selectId);
     }
 
+    // ---- Model selector --------------------------------------------------
+    async function loadModels() {
+      // Populate the model dropdown with vision-capable models from the API,
+      // pre-selecting the server's configured default. On failure the selector is
+      // left empty and uploads fall back to the server default.
+      const select = document.getElementById("model-select");
+      try {
+        const data = await fetch("/api/models").then((res) => res.json());
+        select.innerHTML = "";
+        for (const name of data.models) {
+          const opt = document.createElement("option");
+          opt.value = name;
+          opt.textContent = name;
+          if (name === data.default) opt.selected = true;
+          select.appendChild(opt);
+        }
+      } catch (err) {
+        // Leave the selector empty; the server applies its default on upload.
+      }
+    }
+
     // ---- Upload ----------------------------------------------------------
     async function uploadReceipt() {
       const input = document.getElementById("upload-input");
@@ -378,6 +414,8 @@
 
       const form = new FormData();
       form.append("file", file);
+      const model = document.getElementById("model-select").value;
+      if (model) form.append("model", model);
       try {
         const res = await fetch("/api/receipts", { method: "POST", body: form });
         const data = await res.json();
@@ -386,14 +424,10 @@
           status.className = "upload-status error";
           return;
         }
-        if (data.outcome === "skipped_duplicate") {
-          status.textContent = `Already ingested as receipt #${data.receipt_id}.`;
-          status.className = "upload-status warn";
-        } else {
-          status.textContent =
-            `Loaded receipt #${data.receipt_id} (${display(data.status).replace("_", " ")}).`;
-          status.className = "upload-status ok";
-        }
+        status.textContent =
+          `Loaded receipt #${data.receipt_id} with ${data.model} ` +
+          `(${display(data.status).replace("_", " ")}).`;
+        status.className = "upload-status ok";
         input.value = "";
         await refresh(data.receipt_id);
       } catch (err) {
@@ -410,6 +444,7 @@
     });
     document.getElementById("upload-button").addEventListener("click", uploadReceipt);
 
+    loadModels();
     refresh();
   </script>
 </body>
