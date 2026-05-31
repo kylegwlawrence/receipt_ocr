@@ -61,6 +61,13 @@
     .status-verified { background: #dcfce7; color: #166534; }
     .status-needs_review { background: #fef3c7; color: #92400e; }
 
+    /* The status cell grows to fit a wrapped review reason printed under the pill. */
+    td.status-cell { white-space: normal; max-width: 260px; vertical-align: top; }
+    .review-reason {
+      display: block; margin-top: 4px;
+      font-size: 11px; line-height: 1.35; color: #92400e; white-space: normal;
+    }
+
     .image-panel img { width: 100%; border-radius: 6px; border: 1px solid var(--border); display: block; }
     .empty { color: var(--muted); font-style: italic; padding: 12px 4px; }
     .count { font-weight: 400; color: var(--muted); font-size: 12px; }
@@ -214,10 +221,19 @@
         for (const col of COLUMNS) {
           const td = document.createElement("td");
           if (col.status) {
+            td.className = "status-cell";
             const pill = document.createElement("span");
             pill.className = "status-pill status-" + display(r.status);
             pill.textContent = display(r.status).replace("_", " ");
             td.appendChild(pill);
+            // Show why a receipt needs review, right under its status pill.
+            if (r.review_reason) {
+              const reason = document.createElement("span");
+              reason.className = "review-reason";
+              reason.textContent = r.review_reason;
+              reason.title = r.review_reason;  // full text on hover if it wraps long
+              td.appendChild(reason);
+            }
           } else if (col.money) {
             td.className = "num";
             td.textContent = fmtMoney(r[col.key]);
