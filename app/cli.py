@@ -24,10 +24,6 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"Ollama vision model (default: {settings.default_model}).",
     )
     parser.add_argument("--verbose", action="store_true", help="Enable debug logging.")
-    parser.add_argument(
-        "--force", action="store_true",
-        help="Re-process the image even if it has already been ingested.",
-    )
     return parser
 
 
@@ -38,7 +34,7 @@ def main(argv: list[str] | None = None) -> int:
         format="%(levelname)s %(name)s: %(message)s",
     )
 
-    result = run_pipeline(args.image, db_path=args.db_path, model=args.model, force=args.force)
+    result = run_pipeline(args.image, db_path=args.db_path, model=args.model)
 
     print(result.message)
     if result.outcome == "loaded" and result.review_reason:

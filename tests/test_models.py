@@ -7,6 +7,7 @@ def test_receipt_roundtrip(session):
     receipt = Receipt(
         source_image_path="/tmp/r.jpg",
         image_sha256="abc123",
+        model="qwen2.5vl:3b",
         merchant="Corner Cafe",
         purchased_at=date(2026, 5, 20),
         subtotal=18.0, tax=1.5, tip=3.0, total=22.5,

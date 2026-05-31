@@ -12,14 +12,15 @@ class LoadVerificationError(RuntimeError):
 
 
 def to_models(
-    parsed: ParsedReceipt, source_image_path: str, image_sha256: str
+    parsed: ParsedReceipt, source_image_path: str, image_sha256: str, model: str
 ) -> Receipt:
     """Build a Receipt (with nested LineItems) from a ParsedReceipt.
 
     Args:
         parsed: The normalized receipt with its status already decided.
         source_image_path: Where the image came from (provenance).
-        image_sha256: The image hash used for dedupe/uniqueness.
+        image_sha256: The image hash (provenance; no longer unique).
+        model: The Ollama model that produced this extraction.
 
     Returns:
         An unsaved Receipt with its line_items relationship populated.
@@ -27,6 +28,7 @@ def to_models(
     return Receipt(
         source_image_path=source_image_path,
         image_sha256=image_sha256,
+        model=model,
         merchant=parsed.merchant,
         purchased_at=parsed.purchased_at,
         subtotal=parsed.subtotal,
@@ -77,6 +79,7 @@ def persist(
     parsed: ParsedReceipt,
     source_image_path: str,
     image_sha256: str,
+    model: str,
 ) -> int:
     """Insert the receipt + line items, flush, verify, and return the new id.
 
@@ -89,7 +92,8 @@ def persist(
         session: Active DB session.
         parsed: The normalized receipt to store.
         source_image_path: Provenance for the row.
-        image_sha256: Image hash (unique per receipt).
+        image_sha256: Image hash (provenance; no longer unique).
+        model: The Ollama model that produced this extraction.
 
     Returns:
         The new receipt's id.
@@ -97,7 +101,7 @@ def persist(
     Raises:
         LoadVerificationError: If the read-back check fails.
     """
-    receipt = to_models(parsed, source_image_path, image_sha256)
+    receipt = to_models(parsed, source_image_path, image_sha256, model)
     session.add(receipt)
     # flush sends the INSERT to the DB (assigns receipt.id) without committing.
     session.flush()

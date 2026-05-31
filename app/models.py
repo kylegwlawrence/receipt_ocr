@@ -16,12 +16,15 @@ class ReceiptStatus(str, Enum):
 class Receipt(SQLModel, table=True):
     """A receipt header row.
 
-    image_sha256 is unique so the same photo is never ingested twice.
+    One row per pipeline run. image_sha256 is indexed but NOT unique: the same
+    photo may be processed by several models (or several times), producing one row
+    each. The model column records which Ollama model produced this extraction.
     """
 
     id: int | None = Field(default=None, primary_key=True)
     source_image_path: str
-    image_sha256: str = Field(index=True, unique=True)
+    image_sha256: str = Field(index=True)
+    model: str  # Ollama model that produced this extraction, e.g. "qwen2.5vl:3b"
     merchant: str | None = None
     # The parsing stage converts ReceiptExtraction.purchased_at (raw str) to date before loading.
     purchased_at: date | None = None

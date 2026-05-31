@@ -7,7 +7,6 @@ from app.ingestion import (
     ingest,
     validate_image_path,
 )
-from app.models import Receipt, ReceiptStatus
 
 
 def _write_image(tmp_path, name="r.jpg", data=b"fake-image-bytes"):
@@ -34,26 +33,9 @@ def test_compute_sha256_matches_hashlib(tmp_path):
     assert compute_sha256(p) == hashlib.sha256(data).hexdigest()
 
 
-def test_ingest_flags_new_image(tmp_path, session):
+def test_ingest_returns_path_and_hash(tmp_path):
+    # Ingestion no longer checks for duplicates; it just validates and hashes.
     p = _write_image(tmp_path)
-    result = ingest(p, session)
-    assert result.is_duplicate is False
-    assert result.existing_id is None
+    result = ingest(p)
+    assert result.path == p
     assert result.sha256 == hashlib.sha256(b"fake-image-bytes").hexdigest()
-
-
-def test_ingest_detects_duplicate(tmp_path, session):
-    p = _write_image(tmp_path)
-    digest = hashlib.sha256(b"fake-image-bytes").hexdigest()
-    session.add(
-        Receipt(
-            source_image_path=str(p),
-            image_sha256=digest,
-            status=ReceiptStatus.VERIFIED,
-        )
-    )
-    session.commit()
-
-    result = ingest(p, session)
-    assert result.is_duplicate is True
-    assert result.existing_id is not None

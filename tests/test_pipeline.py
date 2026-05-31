@@ -1,8 +1,9 @@
 import types
 
 from sqlalchemy.pool import StaticPool
-from sqlmodel import SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
+from app.models import Receipt
 from app.pipeline import run_pipeline
 
 
@@ -28,18 +29,34 @@ GOOD_JSON = (
 )
 
 
-def test_pipeline_loads_then_skips_duplicate(tmp_path):
+def test_pipeline_loads_same_image_each_run(tmp_path):
+    # With dedupe removed, re-running the same image creates a distinct new row
+    # (this is what lets one receipt be compared across models).
     img = tmp_path / "r.jpg"
     img.write_bytes(b"img-bytes")
     engine = _engine()
 
     first = run_pipeline(img, engine=engine, client=_client(GOOD_JSON))
-    assert first.outcome == "loaded"
-    assert first.receipt_id is not None
-
     second = run_pipeline(img, engine=engine, client=_client(GOOD_JSON))
-    assert second.outcome == "skipped_duplicate"
-    assert second.receipt_id == first.receipt_id
+
+    assert first.outcome == "loaded"
+    assert second.outcome == "loaded"
+    assert first.receipt_id is not None
+    assert second.receipt_id != first.receipt_id
+
+
+def test_pipeline_records_model_per_run(tmp_path):
+    # Two models on the same image produce two rows with different model values.
+    img = tmp_path / "r.jpg"
+    img.write_bytes(b"img-bytes")
+    engine = _engine()
+
+    run_pipeline(img, engine=engine, client=_client(GOOD_JSON), model="model-a")
+    run_pipeline(img, engine=engine, client=_client(GOOD_JSON), model="model-b")
+
+    with Session(engine) as s:
+        models = sorted(r.model for r in s.exec(select(Receipt)).all())
+    assert models == ["model-a", "model-b"]
 
 
 def test_pipeline_error_on_bad_extraction(tmp_path):

@@ -13,12 +13,12 @@ from app.db import get_session, init_db, make_engine
 from app.extraction import ExtractionError, extract
 from app.ingestion import ingest
 from app.loading import LoadVerificationError, persist
-from app.models import Receipt, ReceiptStatus
+from app.models import ReceiptStatus
 from app.parsing import parse
 
 logger = logging.getLogger("app")
 
-Outcome = Literal["loaded", "skipped_duplicate", "error"]
+Outcome = Literal["loaded", "error"]
 
 
 @dataclass
@@ -39,9 +39,11 @@ def run_pipeline(
     model: str | None = None,
     engine: Engine | None = None,
     client=None,
-    force: bool = False,
 ) -> PipelineResult:
     """Run the full pipeline on a single receipt image.
+
+    Every call inserts a new receipt row; the same image may be processed any number
+    of times (e.g. once per model for comparison).
 
     Args:
         image_path: Path to the receipt image.
@@ -50,36 +52,27 @@ def run_pipeline(
         model: Ollama model override; defaults to settings.default_model.
         engine: Pre-built engine (used by tests). When None, one is created from db_path.
         client: Ollama-like client override (used by tests). Passed to extraction.
-        force: When True, delete any existing receipt for this image and re-process it.
 
     Returns:
         A PipelineResult describing what happened.
     """
     engine = engine or make_engine(db_path or settings.default_db_path)
     init_db(engine)
+    resolved_model = model or settings.default_model
 
     try:
         with get_session(engine) as session:
-            ingested = ingest(image_path, session)
-            if ingested.is_duplicate:
-                if not force:
-                    logger.info("Duplicate image; skipping (existing id=%s)", ingested.existing_id)
-                    return PipelineResult(
-                        outcome="skipped_duplicate",
-                        message=f"Already ingested as receipt {ingested.existing_id}",
-                        receipt_id=ingested.existing_id,
-                    )
-                existing = session.get(Receipt, ingested.existing_id)
-                if existing:
-                    logger.info("Force re-processing; deleting existing receipt id=%s", existing.id)
-                    session.delete(existing)
-                    session.flush()
-
-            extraction = extract(ingested.path, model=model, client=client)
+            ingested = ingest(image_path)
+            extraction = extract(ingested.path, model=resolved_model, client=client)
             parsed = parse(extraction)
-            receipt_id = persist(session, parsed, str(ingested.path), ingested.sha256)
+            receipt_id = persist(
+                session, parsed, str(ingested.path), ingested.sha256, resolved_model
+            )
 
-            logger.info("Loaded receipt id=%s status=%s", receipt_id, parsed.status.value)
+            logger.info(
+                "Loaded receipt id=%s model=%s status=%s",
+                receipt_id, resolved_model, parsed.status.value,
+            )
             return PipelineResult(
                 outcome="loaded",
                 message=f"Loaded receipt {receipt_id} ({parsed.status.value})",

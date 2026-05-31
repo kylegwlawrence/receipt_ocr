@@ -40,6 +40,7 @@ def _make_receipt(image_path: str, sha: str) -> int:
             merchant="Joe's Cafe",
             source_image_path=image_path,
             image_sha256=sha,
+            model="qwen2.5vl:3b",
             status=ReceiptStatus.VERIFIED,
         )
         receipt.line_items = [

@@ -21,18 +21,19 @@ def _parsed() -> ParsedReceipt:
 
 
 def test_persist_writes_and_verifies(session):
-    rid = persist(session, _parsed(), "/tmp/r.jpg", "hash-1")
+    rid = persist(session, _parsed(), "/tmp/r.jpg", "hash-1", "qwen2.5vl:3b")
     assert isinstance(rid, int)
 
     row = session.get(Receipt, rid)
     assert row is not None
     assert row.merchant == "Corner Cafe"
+    assert row.model == "qwen2.5vl:3b"
     assert row.status == ReceiptStatus.VERIFIED
     assert len(row.line_items) == 2
 
 
 def test_verify_write_raises_on_count_mismatch(session):
-    rid = persist(session, _parsed(), "/tmp/r.jpg", "hash-2")
+    rid = persist(session, _parsed(), "/tmp/r.jpg", "hash-2", "qwen2.5vl:3b")
     with pytest.raises(LoadVerificationError):
         verify_write(session, rid, expected_line_items=99)
 
@@ -47,7 +48,7 @@ def test_persist_round_trips_line_item_status(session):
     parsed = _parsed()
     parsed.line_items[0].status = ReceiptStatus.NEEDS_REVIEW
     parsed.line_items[0].review_reason = "qty*unit_price (10.00) != line_total (99.00)"
-    rid = persist(session, parsed, "/tmp/r.jpg", "hash-status")
+    rid = persist(session, parsed, "/tmp/r.jpg", "hash-status", "qwen2.5vl:3b")
 
     row = session.get(Receipt, rid)
     flagged = next(i for i in row.line_items if i.description == "Latte")

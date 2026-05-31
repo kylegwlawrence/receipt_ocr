@@ -1,13 +1,9 @@
-"""Ingestion stage: validate the image, hash it, and check for duplicates."""
+"""Ingestion stage: validate the image and hash it."""
 from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
-
-from sqlmodel import Session, select
-
-from app.models import Receipt
 
 # Common phone-camera formats. Extension check is a cheap sanity gate, not a
 # guarantee the bytes are a valid image (the model call is the real test).
@@ -20,15 +16,12 @@ class IngestResult:
 
     Attributes:
         path: The validated image path.
-        sha256: Hex SHA-256 digest of the file bytes.
-        is_duplicate: True if a receipt with this hash already exists.
-        existing_id: The id of the existing receipt when is_duplicate is True.
+        sha256: Hex SHA-256 digest of the file bytes. Stored as provenance; no
+            longer used for dedupe, but lets a photo's runs be grouped later.
     """
 
     path: Path
     sha256: str
-    is_duplicate: bool
-    existing_id: int | None
 
 
 def validate_image_path(path: str | Path) -> Path:
@@ -64,28 +57,14 @@ def compute_sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def find_existing(session: Session, image_sha256: str) -> Receipt | None:
-    """Return the existing receipt with this image hash, if any."""
-    statement = select(Receipt).where(Receipt.image_sha256 == image_sha256)
-    return session.exec(statement).first()
-
-
-def ingest(path: str | Path, session: Session) -> IngestResult:
-    """Validate and hash the image, then check the DB for a duplicate.
+def ingest(path: str | Path) -> IngestResult:
+    """Validate and hash the image.
 
     Args:
         path: Path to the receipt image.
-        session: Active DB session for the duplicate lookup.
 
     Returns:
-        An IngestResult describing the image and whether it's a duplicate.
+        An IngestResult with the validated path and its SHA-256 hash.
     """
     validated = validate_image_path(path)
-    digest = compute_sha256(validated)
-    existing = find_existing(session, digest)
-    return IngestResult(
-        path=validated,
-        sha256=digest,
-        is_duplicate=existing is not None,
-        existing_id=existing.id if existing else None,
-    )
+    return IngestResult(path=validated, sha256=compute_sha256(validated))
