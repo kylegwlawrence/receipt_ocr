@@ -40,3 +40,16 @@ def test_verify_write_raises_on_count_mismatch(session):
 def test_verify_write_raises_when_missing(session):
     with pytest.raises(LoadVerificationError):
         verify_write(session, receipt_id=123456, expected_line_items=0)
+
+
+def test_persist_round_trips_line_item_status(session):
+    # Per-item status and reason must survive the write and read back unchanged.
+    parsed = _parsed()
+    parsed.line_items[0].status = ReceiptStatus.NEEDS_REVIEW
+    parsed.line_items[0].review_reason = "qty*unit_price (10.00) != line_total (99.00)"
+    rid = persist(session, parsed, "/tmp/r.jpg", "hash-status")
+
+    row = session.get(Receipt, rid)
+    flagged = next(i for i in row.line_items if i.description == "Latte")
+    assert flagged.status == ReceiptStatus.NEEDS_REVIEW
+    assert "!=" in flagged.review_reason

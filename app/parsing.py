@@ -2,7 +2,8 @@
 
 Pure functions only — no I/O. Given a ReceiptExtraction, produce a ParsedReceipt with
 cleaned values, a status (verified / needs_review), and a human-readable reason when the
-data looks incomplete or inconsistent.
+data looks incomplete or inconsistent. Each line item is reconciled the same way
+(quantity x unit_price vs line_total) and a flagged item rolls up to flag its receipt.
 """
 from __future__ import annotations
 
@@ -26,6 +27,8 @@ class ParsedLineItem:
     quantity: float | None
     unit_price: float | None
     line_total: float | None
+    status: ReceiptStatus = ReceiptStatus.NEEDS_REVIEW
+    review_reason: str | None = None
 
 
 @dataclass
@@ -63,21 +66,55 @@ def round_money(value: float | None) -> float | None:
     return None if value is None else round(value, 2)
 
 
+def reconcile_line_item(item: ParsedLineItem) -> tuple[ReceiptStatus, str | None]:
+    """Decide a per-item status by checking the line's arithmetic.
+
+    Flags an item when quantity x unit_price does not match its printed line_total,
+    or when line_total is non-positive. The arithmetic check only runs when unit_price
+    and line_total are both present; a missing quantity is treated as 1 (the common
+    single-unit case), mirroring how the receipt-level check treats missing tax/tip as 0.
+
+    Args:
+        item: A cleaned line item whose monetary fields are already rounded.
+
+    Returns:
+        (status, review_reason). review_reason is None when verified.
+    """
+    reasons: list[str] = []
+    tol = settings.reconcile_tolerance
+
+    if item.line_total is not None and item.line_total <= 0:
+        reasons.append("non-positive line total")
+
+    # Use `is not None` (not truthiness) so a 0 unit_price/quantity is still checked.
+    if item.unit_price is not None and item.line_total is not None:
+        quantity = item.quantity if item.quantity is not None else 1
+        expected = quantity * item.unit_price
+        if abs(expected - item.line_total) > tol:
+            reasons.append(
+                f"qty*unit_price ({expected:.2f}) != line_total ({item.line_total:.2f})"
+            )
+
+    if reasons:
+        return ReceiptStatus.NEEDS_REVIEW, "; ".join(reasons)
+    return ReceiptStatus.VERIFIED, None
+
+
 def _clean_line_items(items: list[LineItemExtraction]) -> list[ParsedLineItem]:
-    """Drop blank-description items and round monetary fields."""
+    """Drop blank-description items, round monetary fields, and flag bad arithmetic."""
     cleaned: list[ParsedLineItem] = []
     for it in items:
         desc = (it.description or "").strip()
         if not desc:
             continue
-        cleaned.append(
-            ParsedLineItem(
-                description=desc,
-                quantity=it.quantity,
-                unit_price=round_money(it.unit_price),
-                line_total=round_money(it.line_total),
-            )
+        item = ParsedLineItem(
+            description=desc,
+            quantity=it.quantity,
+            unit_price=round_money(it.unit_price),
+            line_total=round_money(it.line_total),
         )
+        item.status, item.review_reason = reconcile_line_item(item)
+        cleaned.append(item)
     return cleaned
 
 
@@ -108,6 +145,11 @@ def reconcile(parsed: ParsedReceipt) -> tuple[ReceiptStatus, str | None]:
             reasons.append(
                 f"subtotal+tax+tip ({expected:.2f}) != total ({parsed.total:.2f})"
             )
+
+    # Roll up per-item flags so a verified receipt never hides a bad line item.
+    flagged = [it for it in parsed.line_items if it.status is ReceiptStatus.NEEDS_REVIEW]
+    if flagged:
+        reasons.append(f"{len(flagged)} line item(s) need review")
 
     if reasons:
         return ReceiptStatus.NEEDS_REVIEW, "; ".join(reasons)

@@ -76,3 +76,58 @@ def test_empty_line_items_flagged_for_review():
     parsed = parse(ext)
     assert parsed.line_items == []
     assert "no line items" in parsed.review_reason
+
+
+def test_line_item_flagged_when_qty_price_mismatch():
+    # The header reconciles, so the only receipt reason is the bad line rolling up.
+    ext = _good()
+    ext.line_items = [
+        LineItemExtraction(description="Latte", quantity=2, unit_price=5.0, line_total=10.0),
+        LineItemExtraction(description="Muffin", quantity=1, unit_price=8.0, line_total=99.0),
+    ]
+    parsed = parse(ext)
+    assert parsed.line_items[0].status == ReceiptStatus.VERIFIED
+    assert parsed.line_items[0].review_reason is None
+    assert parsed.line_items[1].status == ReceiptStatus.NEEDS_REVIEW
+    assert "!=" in parsed.line_items[1].review_reason
+    # The flagged item rolls up to flag the receipt.
+    assert parsed.status == ReceiptStatus.NEEDS_REVIEW
+    assert "line item" in parsed.review_reason
+
+
+def test_line_items_verified_when_arithmetic_matches():
+    ext = _good()
+    ext.line_items = [
+        LineItemExtraction(description="Latte", quantity=2, unit_price=5.0, line_total=10.0),
+    ]
+    parsed = parse(ext)
+    assert parsed.line_items[0].status == ReceiptStatus.VERIFIED
+    assert parsed.status == ReceiptStatus.VERIFIED
+
+
+def test_missing_quantity_treated_as_one():
+    # A single-unit line often omits quantity: unit_price should equal line_total.
+    ext = _good()
+    ext.line_items = [LineItemExtraction(description="Latte", unit_price=10.0, line_total=10.0)]
+    assert parse(ext).line_items[0].status == ReceiptStatus.VERIFIED
+
+    ext.line_items = [LineItemExtraction(description="Latte", unit_price=10.0, line_total=12.0)]
+    flagged = parse(ext).line_items[0]
+    assert flagged.status == ReceiptStatus.NEEDS_REVIEW
+    assert "!=" in flagged.review_reason
+
+
+def test_line_item_not_flagged_when_unit_price_missing():
+    # Without a unit price the arithmetic is unverifiable, so the item is not flagged.
+    ext = _good()  # its single item has only a line_total
+    parsed = parse(ext)
+    assert parsed.line_items[0].status == ReceiptStatus.VERIFIED
+    assert parsed.status == ReceiptStatus.VERIFIED
+
+
+def test_non_positive_line_total_flagged():
+    ext = _good()
+    ext.line_items = [LineItemExtraction(description="Latte", unit_price=0.0, line_total=0.0)]
+    item = parse(ext).line_items[0]
+    assert item.status == ReceiptStatus.NEEDS_REVIEW
+    assert "non-positive" in item.review_reason

@@ -41,6 +41,8 @@ def to_models(
                 quantity=li.quantity,
                 unit_price=li.unit_price,
                 line_total=li.line_total,
+                status=li.status,
+                review_reason=li.review_reason,
             )
             for li in parsed.line_items
         ],

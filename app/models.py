@@ -52,5 +52,9 @@ class LineItem(SQLModel, table=True):
     quantity: float | None = None
     unit_price: float | None = None
     line_total: float | None = None
+    # Per-item verification: flagged when quantity x unit_price disagrees with the
+    # printed line_total. Defaults to NEEDS_REVIEW (fail-safe), mirroring the header.
+    status: ReceiptStatus = Field(default=ReceiptStatus.NEEDS_REVIEW)
+    review_reason: str | None = None
 
     receipt: Receipt | None = Relationship(back_populates="line_items")
