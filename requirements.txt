@@ -1,4 +1,6 @@
 ollama
+pillow
+pillow-heif
 pydantic
 sqlmodel
 fastapi

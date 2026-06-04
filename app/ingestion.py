@@ -7,7 +7,13 @@ from pathlib import Path
 
 # Common phone-camera formats. Extension check is a cheap sanity gate, not a
 # guarantee the bytes are a valid image (the model call is the real test).
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".tiff", ".bmp"}
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".tiff", ".bmp"}
+
+# Formats Ollama's image decoder can't read. We transcode these to PNG before
+# handing the file to the vision model. iPhones save photos as HEIC by default,
+# so this is the common case for phone-camera receipts. (As a bonus, browsers
+# can't display HEIC either, so storing the PNG makes the web viewer work too.)
+CONVERT_TO_PNG_EXTENSIONS = {".heic", ".heif"}
 
 
 @dataclass
@@ -48,6 +54,46 @@ def validate_image_path(path: str | Path) -> Path:
     return p
 
 
+def convert_to_png(path: Path) -> Path:
+    """Transcode an image to PNG, writing the result next to the original.
+
+    Used for formats the vision model's image decoder can't read (e.g. HEIC).
+    The PNG is written alongside the source with the same stem and a ``.png``
+    suffix; if it already exists it is reused, so repeat runs don't re-encode.
+
+    Args:
+        path: Path to the source image (already validated to exist).
+
+    Returns:
+        Path to the PNG version of the image.
+
+    Raises:
+        RuntimeError: If Pillow / pillow-heif are not installed, or the source
+            bytes cannot be decoded into an image.
+    """
+    try:
+        from PIL import Image, UnidentifiedImageError
+        from pillow_heif import register_heif_opener
+    except ImportError as exc:  # dependency missing -> clear, actionable message
+        raise RuntimeError(
+            f"Cannot convert '{path.name}' to PNG: install 'pillow' and "
+            f"'pillow-heif' (pip install -r requirements.txt)."
+        ) from exc
+
+    # Teaches Pillow to open HEIC/HEIF files; safe to call repeatedly.
+    register_heif_opener()
+
+    dest = path.with_suffix(".png")
+    if dest.exists():
+        return dest
+    try:
+        with Image.open(path) as img:
+            img.save(dest, format="PNG")
+    except (UnidentifiedImageError, OSError) as exc:
+        raise RuntimeError(f"Could not read image '{path.name}': {exc}") from exc
+    return dest
+
+
 def compute_sha256(path: Path) -> str:
     """Return the hex SHA-256 digest of the file's bytes (read in chunks)."""
     h = hashlib.sha256()
@@ -58,13 +104,24 @@ def compute_sha256(path: Path) -> str:
 
 
 def ingest(path: str | Path) -> IngestResult:
-    """Validate and hash the image.
+    """Validate, hash, and (if needed) transcode the image to a readable format.
+
+    HEIC/HEIF images are converted to PNG so the downstream vision model can read
+    them; the returned path then points at the PNG. The SHA-256 is always taken
+    from the original source bytes so a photo's provenance stays stable across
+    runs (and across Pillow versions, whose PNG encoding may differ).
 
     Args:
         path: Path to the receipt image.
 
     Returns:
-        An IngestResult with the validated path and its SHA-256 hash.
+        An IngestResult whose ``path`` is model-readable (the PNG for converted
+        formats, otherwise the original) and whose ``sha256`` hashes the original.
     """
     validated = validate_image_path(path)
-    return IngestResult(path=validated, sha256=compute_sha256(validated))
+    sha256 = compute_sha256(validated)
+    if validated.suffix.lower() in CONVERT_TO_PNG_EXTENSIONS:
+        prepared = convert_to_png(validated)
+    else:
+        prepared = validated
+    return IngestResult(path=prepared, sha256=sha256)

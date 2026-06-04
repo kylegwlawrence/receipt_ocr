@@ -39,3 +39,22 @@ def test_ingest_returns_path_and_hash(tmp_path):
     result = ingest(p)
     assert result.path == p
     assert result.sha256 == hashlib.sha256(b"fake-image-bytes").hexdigest()
+
+
+def test_ingest_converts_heic_to_png(tmp_path):
+    # HEIC can't be read by the vision model, so ingestion transcodes it to a
+    # PNG sibling and returns that path; the hash still tracks the original.
+    pytest.importorskip("pillow_heif")
+    from PIL import Image
+    from pillow_heif import register_heif_opener
+
+    register_heif_opener()
+    src = tmp_path / "receipt.heic"
+    Image.new("RGB", (8, 8), "white").save(src, format="HEIF")
+
+    result = ingest(src)
+
+    assert result.path == src.with_suffix(".png")
+    assert result.path.is_file()
+    # Provenance hash is of the original HEIC bytes, not the generated PNG.
+    assert result.sha256 == compute_sha256(src)

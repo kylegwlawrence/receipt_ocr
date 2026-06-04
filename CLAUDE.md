@@ -37,7 +37,9 @@ ingestion as out of scope; that's now implemented via the web app above.)
 
 - **Python 3.13** with a virtualenv at `.venv`. Activate with `source .venv/bin/activate`.
   Dependencies live in `requirements.txt` (managed with `pip`, no `pyproject.toml`): `ollama`,
-  `pydantic`, `sqlmodel`, `fastapi`, `uvicorn`, `python-multipart`, `pytest`.
+  `pillow`, `pillow-heif`, `pydantic`, `sqlmodel`, `fastapi`, `uvicorn`, `python-multipart`,
+  `pytest`. (`pillow`/`pillow-heif` let ingestion transcode HEIC/HEIF photos to PNG, since the
+  Ollama vision model can't decode HEIC.)
 - **Ollama** (local, `/usr/local/bin/ollama`) serves the vision model. The current default model is `ministral-3:3b` (see `app/config.py`). Use `ollama list` to see what's available locally.
 - **SQLite** is the database target; it defaults to `data/receipts.db` (override with `--db-path`,
   or the `RECEIPTS_DB_PATH` env var for the web app).

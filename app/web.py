@@ -241,6 +241,11 @@ async def upload_receipt(
     if result.outcome != "loaded":
         # Nothing in the DB references this file, so don't leave it on disk.
         dest.unlink(missing_ok=True)
+        # Ingestion transcodes HEIC/HEIF to a sibling PNG; remove that too so a
+        # failed upload leaves nothing behind.
+        png_sibling = dest.with_suffix(".png")
+        if png_sibling != dest:
+            png_sibling.unlink(missing_ok=True)
 
     if result.outcome == "error":
         raise HTTPException(status_code=500, detail=result.message)
