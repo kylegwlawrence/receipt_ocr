@@ -31,7 +31,7 @@ PROMPT = (
     "- tax: the total tax charged.\n"
     "- tip: the tip or gratuity amount.\n"
     "- total: the final amount the customer paid. "
-    "The value sits near the bottom. Sometimes it is called grand total.\n"
+    "The value sits near the bottom. Sometimes it is called grand total or balance.\n"
     "- line_items: one entry per purchased product. Copy each product description "
     "exactly as printed. Include its quantity, unit_price, and line_total when "
     "you can read them.\n"
