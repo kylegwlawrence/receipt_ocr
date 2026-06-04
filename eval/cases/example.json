@@ -1,0 +1,25 @@
+{
+  "image": "images/receipt1.jpg",
+  "expected": {
+    "merchant": "Trader Joe's",
+    "purchased_at": "2026-05-31",
+    "subtotal": 18.47,
+    "tax": 1.52,
+    "tip": null,
+    "total": 19.99,
+    "line_items": [
+      {
+        "description": "Bananas",
+        "quantity": 4,
+        "unit_price": 0.23,
+        "line_total": 0.92
+      },
+      {
+        "description": "Oat Milk",
+        "quantity": 1,
+        "unit_price": 3.49,
+        "line_total": 3.49
+      }
+    ]
+  }
+}
