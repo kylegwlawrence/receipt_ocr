@@ -16,31 +16,32 @@ from app.schemas import ReceiptExtraction
 # This prompt is tuned for small (3-4B) vision models. Guidelines applied:
 # - Short, single-idea sentences (small models lose rules buried in long clauses).
 # - Positive instructions over negation ("pick the largest TOTAL" beats "not the
-#   subtotal"), because small models often drop the "not".
+#   subtotal", "use null" beats "never guess"), because small models often drop the "not".
 # Per-field hints also live in the Pydantic schema (app/schemas.py); Ollama sends
 # that schema to the model, so the two work together.
 PROMPT = (
     "You read a photo of a store receipt and return its data as JSON.\n"
     "\n"
-    "Read every line of the image. Copy values exactly as printed.\n"
+    "Read every line of the image.\n"
     "\n"
     "Fields:\n"
     "- merchant: the business name. It is the big header at the top.\n"
     "- purchased_at: the purchase date. Use the format YYYY-MM-DD.\n"
     "- subtotal: the items total before tax.\n"
-    "- tax: the tax amount.\n"
+    "- tax: the total tax charged.\n"
     "- tip: the tip or gratuity amount.\n"
     "- total: the final amount the customer paid. It is usually the largest money "
     "value and sits near the bottom. If you see more than one TOTAL line, choose "
     "the grand total.\n"
-    "- line_items: one entry per purchased product. Include its description, and "
-    "its quantity, unit_price, and line_total when you can read them.\n"
+    "- line_items: one entry per purchased product. Copy each product description "
+    "exactly as printed. Include its quantity, unit_price, and line_total when "
+    "you can read them.\n"
     "\n"
     "Rules for numbers:\n"
     "- Write money as a plain decimal: 12.50, not $12.50 or 12,50.\n"
     "- Remove currency symbols and thousands separators: 1,299.00 becomes 1299.00.\n"
     "\n"
-    "If a value is missing or you cannot read it, use null. Never guess a value."
+    "If a value is missing or you cannot read it, use null."
 )
 
 

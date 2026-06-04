@@ -48,7 +48,7 @@ class ReceiptExtraction(BaseModel):
     # datetime.date before assigning it to Receipt.purchased_at.
     purchased_at: str | None = Field(
         default=None,
-        description="Purchase date as printed, preferably as YYYY-MM-DD. Null if not shown.",
+        description="Purchase date as YYYY-MM-DD. Null if not shown.",
     )
     subtotal: float | None = Field(
         default=None, description="Items total before tax. Plain decimal. Null if not shown."
