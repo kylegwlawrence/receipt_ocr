@@ -24,9 +24,9 @@ Options: `--db-path PATH` (default `data/receipts.db`), `--model NAME` (default 
 A FastAPI app serves a browser viewer plus an upload form:
 ```bash
 ollama serve                       # if it isn't already running
-uvicorn app.web:app --reload       # or: python -m app.web
+uvicorn app.web:app --port 8005 --reload   # or: python -m app.web
 ```
-Then open http://127.0.0.1:8000. From the page you can:
+Then open http://127.0.0.1:8005. From the page you can:
 - Upload a receipt photo and pick which installed vision model to extract with.
 - Browse stored receipts, view their line items, and see the original photo.
 - Delete a receipt (removes the database rows; the photo on disk is left in place).

@@ -46,7 +46,7 @@ ingestion as out of scope; that's now implemented via the web app above.)
 - Install: `pip install -r requirements.txt`
 - Test: `pytest` (unit tests, model mocked); `pytest -m integration` for the real-model test
 - Run (CLI): `python -m app <image>` (options: `--db-path`, `--model`, `--verbose`)
-- Run (web): `uvicorn app.web:app --reload` (or `python -m app.web`), then open http://127.0.0.1:8000
+- Run (web): `uvicorn app.web:app --port 8005 --reload` (or `python -m app.web`), then open http://127.0.0.1:8005
 
 No lint or build tooling is configured yet.
 

@@ -293,7 +293,7 @@ def main() -> None:  # pragma: no cover - convenience runner
     """Run the dev server via ``python -m app.web``."""
     import uvicorn
 
-    uvicorn.run("app.web:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("app.web:app", host="127.0.0.1", port=8005, reload=True)
 
 
 if __name__ == "__main__":  # pragma: no cover
