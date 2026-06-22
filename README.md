@@ -4,11 +4,13 @@ Read data from photos of receipts using a local vision model (via Ollama), struc
 store it in SQLite. Available as a command-line tool and a small web app.
 
 ## Requirements
-- Python 3.13 (a `.venv` is included)
-- Ollama running locally with a vision model pulled
+- Python 3.12 or newer
+- Ollama running locally with a vision model pulled (only needed for model
+  extraction; the manual-entry flow works without it)
 
 ## Setup
 ```bash
+python3 -m venv .venv         # first time only
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
@@ -30,6 +32,10 @@ Then open http://127.0.0.1:8005. From the page you can:
 - Upload a receipt photo and pick which installed vision model to extract with.
 - Browse stored receipts, view their line items, and see the original photo.
 - Delete a receipt (removes the database rows; the photo on disk is left in place).
+
+There's also a manual-entry page at `/entry.html` for hand-typing a receipt's
+fields alongside its photo, skipping the model entirely (records are stored as
+`verified` and tagged `model="manual-entry"`).
 
 Uploaded photos are saved under `images/` (gitignored). The database path defaults to
 `data/receipts.db` and can be overridden with the `RECEIPTS_DB_PATH` environment variable.
@@ -68,6 +74,7 @@ keep it on the tailnet rather than binding `0.0.0.0` on an untrusted network.
 - `GET  /api/receipts/{id}/items` — line items for one receipt
 - `GET  /api/receipts/{id}/image` — the original receipt photo
 - `POST /api/receipts` — upload a photo (multipart `file`, optional `model`) and run the pipeline
+- `POST /api/receipts/manual` — save a photo plus hand-typed fields, skipping the model
 - `DELETE /api/receipts/{id}` — delete a receipt and its line items
 
 ## Inspecting the data
