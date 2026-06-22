@@ -105,6 +105,37 @@
     .status.working { color: var(--muted); }
     .status.ok { color: #166534; }
     .status.error { color: #b91c1c; }
+
+    /* ---- Mobile / small screens (phones, e.g. iPhone) -------------------
+       Tuned for an iPhone 16 Pro (~402px CSS-px wide) but driven by width, so
+       it applies to any narrow viewport. */
+    @media (max-width: 640px) {
+      body { padding: 16px; }
+      .topnav { margin: -16px -16px 16px; padding: 0 8px; overflow-x: auto; }
+      .topnav a { padding: 14px 12px; white-space: nowrap; }
+
+      /* 16px inputs stop iOS Safari from auto-zooming the page on focus. */
+      input[type="text"], input[type="number"], input[type="date"], select { font-size: 16px; }
+      button { font-size: 16px; padding: 11px 16px; }
+
+      /* Line items reflow to two rows: the name spans the top, then the
+         category, value, and remove button sit beneath it — the four-up grid
+         is too wide for a phone. The header labels don't map to the wrapped
+         layout, so hide them and lean on the inputs' placeholders. */
+      .items-head { display: none; }
+      .item-row {
+        grid-template-columns: 1fr 84px 40px;
+        grid-template-areas:
+          "name name name"
+          "cat  val  rm";
+        gap: 6px 8px; margin-bottom: 14px;
+      }
+      .item-row .name { grid-area: name; }
+      .item-row .category { grid-area: cat; }
+      .item-row .value { grid-area: val; }
+      .item-row .remove { grid-area: rm; }
+      button.remove { width: 40px; height: 40px; }
+    }
   </style>
 </head>
 <body>

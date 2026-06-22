@@ -76,6 +76,25 @@
     tfoot td { font-weight: 700; border-top: 2px solid var(--border); border-bottom: none; }
     .uncategorized td:first-child { color: var(--muted); font-style: italic; }
     .empty { color: var(--muted); font-style: italic; padding: 12px 4px; }
+
+    /* ---- Mobile / small screens (phones, e.g. iPhone) -------------------
+       Tuned for an iPhone 16 Pro (~402px CSS-px wide) but driven by width, so
+       it applies to any narrow viewport. */
+    @media (max-width: 640px) {
+      body { padding: 16px; }
+      .topnav { margin: -16px -16px 16px; padding: 0 8px; overflow-x: auto; }
+      .topnav a { padding: 14px 12px; white-space: nowrap; }
+
+      /* Filters drop from four columns to two so each control stays usable. */
+      .filters { grid-template-columns: 1fr 1fr; }
+
+      /* 16px inputs stop iOS Safari from auto-zooming the page on focus. */
+      input[type="date"], select { font-size: 16px; }
+      button.reset { font-size: 16px; padding: 10px 16px; }
+
+      /* Tighten cell padding so the three columns fit a phone width. */
+      th, td { padding: 9px 6px; }
+    }
   </style>
 </head>
 <body>

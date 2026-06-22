@@ -116,6 +116,31 @@
       font-size: 13px; padding: 7px 10px; border-radius: 6px;
       border: 1px solid var(--border); background: #fff; color: #111827; cursor: pointer;
     }
+
+    /* ---- Mobile / small screens (phones, e.g. iPhone) -------------------
+       Tuned for an iPhone 16 Pro (~402px CSS-px wide) but driven by width, so
+       it applies to any narrow viewport. */
+    @media (max-width: 640px) {
+      body { padding: 16px; }
+      /* Re-fit the full-bleed nav to the smaller body padding; let the tabs
+         scroll sideways if they ever outgrow the screen. */
+      .topnav { margin: -16px -16px 16px; padding: 0 8px; overflow-x: auto; }
+      .topnav a { padding: 14px 12px; white-space: nowrap; }
+
+      /* Stack the line items and the photo instead of placing them side by side. */
+      .detail { flex-direction: column; }
+      .detail .image-panel { flex: none; width: 100%; }
+      /* Let wide tables scroll within their panel rather than push the page
+         out past the viewport edge. */
+      .detail .panel { overflow-x: auto; }
+
+      /* 16px inputs stop iOS Safari from auto-zooming the page on focus. */
+      input, select, button { font-size: 16px; }
+      tr.filter-row input { font-size: 16px; }
+      /* Roomier tap targets for touch. */
+      button { padding: 10px 16px; }
+      .delete-btn { padding: 8px 12px; }
+    }
   </style>
 </head>
 <body>
