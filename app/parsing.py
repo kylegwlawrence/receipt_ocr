@@ -27,6 +27,8 @@ class ParsedLineItem:
     quantity: float | None
     unit_price: float | None
     line_total: float | None
+    # Optional grocery category; only set by manual entry (see app.config.ITEM_CATEGORIES).
+    category: str | None = None
     status: ReceiptStatus = ReceiptStatus.NEEDS_REVIEW
     review_reason: str | None = None
 

@@ -27,12 +27,20 @@ A linear ingestion pipeline; each stage hands off to the next. Keep the stages a
 The web app (`app/web.py`) is a thin FastAPI layer over this pipeline: it reuses `run_pipeline`
 for uploads, serves a read-only viewer (`app/static/index.html`), and serves a manual
 receipt-entry page (`app/static/entry.html`) for hand-annotating receipts. Endpoints:
-`GET /api/models` (installed vision-capable Ollama models + default), `GET /api/receipts`,
-`GET /api/receipts/{id}/items`, `GET /api/receipts/{id}/image`, `POST /api/receipts`
-(upload + run pipeline), `POST /api/receipts/manual` (save a photo + hand-typed fields,
-skipping the model; reuses `loading.persist`, stored as `verified` and tagged
-`model="manual-entry"`), `DELETE /api/receipts/{id}` (delete DB rows; the photo on disk is
-kept). Uploaded photos are saved to `images/` (gitignored).
+`GET /api/models` (installed vision-capable Ollama models + default),
+`GET /api/categories` (the fixed line-item category list, from `config.ITEM_CATEGORIES`),
+`GET /api/receipts`, `GET /api/receipts/{id}/items`, `GET /api/receipts/{id}/image`,
+`POST /api/receipts` (upload + run pipeline), `POST /api/receipts/manual` (save a photo +
+hand-typed fields, skipping the model; reuses `loading.persist`, stored as `verified` and
+tagged `model="manual-entry"`), `DELETE /api/receipts/{id}` (delete DB rows; the photo on disk
+is kept). Uploaded photos are saved to `images/` (gitignored).
+
+Line items carry an optional `category` (a `LineItem.category` column). It's hand-assigned via a
+per-row dropdown on the manual-entry page, constrained to the fixed `config.ITEM_CATEGORIES`
+list (validated server-side in `web.py`); model extractions leave it null. The dropdown and the
+validator share that one list via `GET /api/categories`. `db.init_db` runs a small idempotent
+additive migration (`_apply_additive_migrations`) so a database created before the column
+existed gains it via `ALTER TABLE ... ADD COLUMN` without losing data.
 
 Out of scope for now: an analytics dashboard and RAG retrieval. (An earlier draft listed web
 ingestion as out of scope; that's now implemented via the web app above.)

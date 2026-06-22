@@ -42,11 +42,11 @@
     label.field:last-child { margin-bottom: 0; }
     label.field > span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
 
-    input[type="text"], input[type="number"], input[type="date"] {
+    input[type="text"], input[type="number"], input[type="date"], select {
       width: 100%; font-size: 14px; padding: 9px 11px;
       border: 1px solid var(--border); border-radius: 6px; background: #fff; color: #111827;
     }
-    input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
     /* Store/date/total/tax sit in a responsive two-up grid. */
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
@@ -60,9 +60,9 @@
     /* Hidden inputs are triggered by their styled buttons. */
     input[type="file"] { display: none; }
 
-    /* Line-item table: name | value | remove. */
+    /* Line-item table: name | category | value | remove. */
     .items-head, .item-row {
-      display: grid; grid-template-columns: 1fr 130px 36px; gap: 8px; align-items: center;
+      display: grid; grid-template-columns: 1fr 160px 120px 36px; gap: 8px; align-items: center;
     }
     .items-head { margin-bottom: 8px; }
     .items-head span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
@@ -147,6 +147,7 @@
       <h2>Line items</h2>
       <div class="items-head">
         <span>Item</span>
+        <span>Category</span>
         <span>Value</span>
         <span></span>
       </div>
@@ -165,6 +166,9 @@
 
     // The chosen photo, updated whenever either file input changes.
     let selectedFile = null;
+    // Allowable line-item categories, fetched from the server (single source of
+    // truth in app/config.py). Each item row's dropdown is built from this list.
+    let categories = [];
 
     const cameraInput = document.getElementById("camera-input");
     const fileInput = document.getElementById("file-input");
@@ -197,8 +201,8 @@
       preview.hidden = false;
     }
 
-    /** Append a blank line-item row (name + value + remove button). */
-    function addItemRow(name = "", value = "") {
+    /** Append a blank line-item row (name + category + value + remove button). */
+    function addItemRow(name = "", category = "", value = "") {
       const row = document.createElement("div");
       row.className = "item-row";
 
@@ -208,6 +212,22 @@
       nameInput.placeholder = "Item name";
       nameInput.autocomplete = "off";
       nameInput.value = name;
+
+      // Category dropdown: a leading blank option (no category) plus one option
+      // per allowed category. Built from the fetched `categories` list.
+      const categorySelect = document.createElement("select");
+      categorySelect.className = "category";
+      const blankOption = document.createElement("option");
+      blankOption.value = "";
+      blankOption.textContent = "—";
+      categorySelect.appendChild(blankOption);
+      for (const name of categories) {
+        const opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        categorySelect.appendChild(opt);
+      }
+      categorySelect.value = category;
 
       const valueInput = document.createElement("input");
       valueInput.type = "number";
@@ -225,7 +245,7 @@
       removeBtn.title = "Remove item";
       removeBtn.addEventListener("click", () => row.remove());
 
-      row.append(nameInput, valueInput, removeBtn);
+      row.append(nameInput, categorySelect, valueInput, removeBtn);
       itemsBody.appendChild(row);
     }
 
@@ -242,13 +262,14 @@
       statusEl.className = "status" + (kind ? " " + kind : "");
     }
 
-    /** Collect non-empty line items as {description, value} objects. */
+    /** Collect non-empty line items as {description, category, value} objects. */
     function collectItems() {
       const items = [];
       for (const row of itemsBody.querySelectorAll(".item-row")) {
         const description = row.querySelector(".name").value.trim();
+        const category = row.querySelector(".category").value;
         const value = row.querySelector(".value").value.trim();
-        if (description) items.push({ description, value });
+        if (description) items.push({ description, category, value });
       }
       return items;
     }
@@ -301,8 +322,20 @@
       resetItems();
     }
 
-    // Start with three blank line-item rows.
-    resetItems();
+    /** Fetch the allowable categories, then lay out the initial blank rows. */
+    async function loadCategories() {
+      try {
+        const data = await fetch("/api/categories").then((res) => res.json());
+        categories = data.categories || [];
+      } catch (err) {
+        // Leave the list empty; rows still render with just the blank option and
+        // the server validates anything submitted.
+      }
+      resetItems();
+    }
+
+    // Populate the dropdowns, then start with three blank line-item rows.
+    loadCategories();
   </script>
 </body>
 </html>

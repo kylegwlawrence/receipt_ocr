@@ -104,6 +104,20 @@ def list_models() -> dict:
     return {"models": vision, "default": default}
 
 
+@app.get("/api/categories")
+def list_categories() -> dict:
+    """Return the fixed set of allowable line-item categories.
+
+    The manual-entry page builds its per-item category dropdown from this list, so
+    both the UI options and the server-side validation share one source of truth
+    (:data:`app.config.ITEM_CATEGORIES`).
+
+    Returns:
+        ``{"categories": [label, ...]}`` in dropdown display order.
+    """
+    return {"categories": list(settings.item_categories)}
+
+
 @app.get("/api/receipts")
 def list_receipts() -> list[dict]:
     """Return every receipt header row, newest first.
@@ -159,6 +173,7 @@ def list_items(receipt_id: int) -> list[dict]:
             {
                 "id": i.id,
                 "description": i.description,
+                "category": i.category,
                 "quantity": i.quantity,
                 "unit_price": i.unit_price,
                 "line_total": i.line_total,
@@ -291,6 +306,29 @@ def _parse_money(value: str | int | float | None) -> float | None:
         raise HTTPException(status_code=400, detail=f"Invalid number: '{value}'") from exc
 
 
+def _parse_category(value: object) -> str | None:
+    """Validate an optional line-item category against the allowed set.
+
+    Args:
+        value: The raw category from a submitted line item (may be None, blank, or
+            one of :data:`app.config.settings.item_categories`).
+
+    Returns:
+        ``None`` for a missing/blank category, otherwise the validated label.
+
+    Raises:
+        HTTPException: 400 if the value is present but not an allowed category.
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    if text == "":
+        return None
+    if text not in settings.item_categories:
+        raise HTTPException(status_code=400, detail=f"Unknown category: '{value}'")
+    return text
+
+
 def _parse_date(value: str | None) -> date | None:
     """Parse an optional ``YYYY-MM-DD`` string from a form into a date (or None).
 
@@ -333,15 +371,18 @@ async def create_manual_receipt(
         purchased_at: Purchase date as ``YYYY-MM-DD`` (optional).
         total: Receipt total as a money string (optional).
         tax: Tax amount as a money string (optional).
-        items: A JSON array of ``{"description": str, "value": str}`` line items.
-            Rows with a blank description are dropped.
+        items: A JSON array of ``{"description": str, "category": str, "value": str}``
+            line items. ``category`` is optional but, when present, must be one of
+            :data:`app.config.settings.item_categories`. Rows with a blank
+            description are dropped.
 
     Returns:
         A dict: ``{"outcome": "loaded", "receipt_id": int, "merchant": str}``.
 
     Raises:
         HTTPException: 400 for an unsupported image, a blank store name, malformed
-            numbers/date, or invalid items JSON; 500 if the write fails.
+            numbers/date, an unknown category, or invalid items JSON; 500 if the
+            write fails.
     """
     suffix = Path(file.filename or "").suffix.lower()
     if suffix not in IMAGE_EXTENSIONS:
@@ -368,6 +409,7 @@ async def create_manual_receipt(
     line_items = [
         ParsedLineItem(
             description=str(row.get("description", "")).strip(),
+            category=_parse_category(row.get("category")),
             quantity=None,
             unit_price=None,
             line_total=_parse_money(row.get("value")),

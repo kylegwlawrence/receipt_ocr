@@ -146,6 +146,62 @@ def test_manual_entry_rejects_blank_store_name(tmp_path, monkeypatch):
     assert exc.value.status_code == 400
 
 
+def test_manual_entry_persists_line_item_categories(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    # A valid category, an explicit blank (no category), and a row that omits the
+    # field entirely all coexist.
+    items = [
+        {"description": "Apples", "category": "fruits and vegetables", "value": "3.00"},
+        {"description": "Mystery", "category": "", "value": "1.00"},
+        {"description": "Bread", "value": "2.00"},  # category key absent
+    ]
+
+    result = _call(
+        file=_upload(),
+        merchant="Market",
+        purchased_at="",
+        total="",
+        tax="",
+        items=json.dumps(items),
+    )
+
+    with get_session(web.engine) as session:
+        lines = session.exec(
+            select(LineItem)
+            .where(LineItem.receipt_id == result["receipt_id"])
+            .order_by(LineItem.id)
+        ).all()
+        assert [(li.description, li.category) for li in lines] == [
+            ("Apples", "fruits and vegetables"),
+            ("Mystery", None),
+            ("Bread", None),
+        ]
+
+
+def test_manual_entry_rejects_unknown_category(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+    with pytest.raises(HTTPException) as exc:
+        _call(
+            file=_upload(),
+            merchant="Store",
+            purchased_at="",
+            total="",
+            tax="",
+            items=json.dumps([{"description": "X", "category": "gadgets", "value": "1"}]),
+        )
+    assert exc.value.status_code == 400
+    # The rejected request must not leave an orphaned file behind.
+    images_dir = tmp_path / "images"
+    assert not images_dir.exists() or not any(images_dir.iterdir())
+
+
+def test_categories_endpoint_lists_configured_categories():
+    from app.config import settings
+
+    result = web.list_categories()
+    assert result["categories"] == list(settings.item_categories)
+
+
 def test_manual_entry_rejects_bad_number(tmp_path, monkeypatch):
     _setup(tmp_path, monkeypatch)
     with pytest.raises(HTTPException) as exc:
