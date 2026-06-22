@@ -118,6 +118,88 @@ def list_categories() -> dict:
     return {"categories": list(settings.item_categories)}
 
 
+@app.get("/api/stores")
+def list_stores() -> dict:
+    """Return the distinct, non-empty store names present in the database.
+
+    Used to populate the store filter on the category-totals page.
+
+    Returns:
+        ``{"stores": [merchant, ...]}`` sorted alphabetically.
+    """
+    with get_session(engine) as session:
+        merchants = session.exec(
+            select(Receipt.merchant).where(Receipt.merchant.is_not(None)).distinct()
+        ).all()
+    return {"stores": sorted(m for m in merchants if m)}
+
+
+@app.get("/api/summary/categories")
+def summary_by_category(
+    date_from: str | None = None,
+    date_to: str | None = None,
+    store: str | None = None,
+    category: str | None = None,
+) -> dict:
+    """Total line-item value per category across all receipts, with optional filters.
+
+    Joins line items to their receipt so the totals can be narrowed by purchase
+    date, store, and/or category. Line items with no category are grouped under
+    ``"(uncategorized)"`` so the per-category totals always reconcile with the grand
+    total. A line item's null ``line_total`` contributes 0.
+
+    Args:
+        date_from: Inclusive lower bound on the receipt's purchase date (YYYY-MM-DD).
+            Receipts with no date never match when any date bound is set.
+        date_to: Inclusive upper bound on the receipt's purchase date (YYYY-MM-DD).
+        store: Exact store name to restrict to (optional).
+        category: Exact category to restrict to (optional).
+
+    Returns:
+        ``{"rows": [{"category", "total", "item_count"}, ...], "grand_total", "item_count"}``
+        with rows sorted by total, largest first.
+
+    Raises:
+        HTTPException: 400 if a date bound is present but not a valid ISO date.
+    """
+    d_from = _parse_date(date_from)
+    d_to = _parse_date(date_to)
+
+    with get_session(engine) as session:
+        stmt = select(LineItem.category, LineItem.line_total).join(
+            Receipt, LineItem.receipt_id == Receipt.id
+        )
+        if store:
+            stmt = stmt.where(Receipt.merchant == store)
+        if category:
+            stmt = stmt.where(LineItem.category == category)
+        # NULL purchased_at never satisfies a >=/<= comparison, so date-filtered
+        # results automatically exclude undated receipts (the intended behavior).
+        if d_from is not None:
+            stmt = stmt.where(Receipt.purchased_at >= d_from)
+        if d_to is not None:
+            stmt = stmt.where(Receipt.purchased_at <= d_to)
+        rows = session.exec(stmt).all()
+
+    totals: dict[str, float] = {}
+    counts: dict[str, int] = {}
+    for cat, line_total in rows:
+        key = cat or "(uncategorized)"
+        totals[key] = round(totals.get(key, 0.0) + (line_total or 0.0), 2)
+        counts[key] = counts.get(key, 0) + 1
+
+    result_rows = sorted(
+        ({"category": k, "total": totals[k], "item_count": counts[k]} for k in totals),
+        key=lambda r: r["total"],
+        reverse=True,
+    )
+    return {
+        "rows": result_rows,
+        "grand_total": round(sum(totals.values()), 2),
+        "item_count": sum(counts.values()),
+    }
+
+
 @app.get("/api/receipts")
 def list_receipts() -> list[dict]:
     """Return every receipt header row, newest first.

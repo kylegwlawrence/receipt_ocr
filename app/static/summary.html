@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Category Totals</title>
+  <style>
+    /* Shared design system, kept in sync with index.html / entry.html. */
+    :root {
+      --border: #d7dbe0;
+      --header-bg: #f3f5f7;
+      --accent: #2563eb;
+      --accent-soft: #e6efff;
+      --muted: #6b7280;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 24px;
+      color: #111827;
+      background: #fafbfc;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; }
+
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    h2 { font-size: 13px; margin: 0 0 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .subtitle { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+    a.back { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600; }
+    a.back:hover { text-decoration: underline; }
+
+    .panel {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    /* Filter controls in a responsive grid. */
+    .filters { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; }
+    label.field { display: block; }
+    label.field > span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+    input[type="date"], select {
+      width: 100%; font-size: 14px; padding: 9px 11px;
+      border: 1px solid var(--border); border-radius: 6px; background: #fff; color: #111827;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .filter-actions { margin-top: 12px; }
+    button.reset {
+      font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 6px;
+      border: 1px solid var(--border); background: #fff; color: #111827; cursor: pointer;
+    }
+    button.reset:hover { background: var(--header-bg); }
+
+    table { border-collapse: collapse; width: 100%; font-size: 14px; }
+    th, td { border-bottom: 1px solid var(--border); padding: 9px 10px; text-align: left; }
+    thead th { background: var(--header-bg); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    /* Clickable, sortable column headers. */
+    thead th.sortable { cursor: pointer; user-select: none; }
+    thead th.sortable:hover { color: #111827; }
+    th .sort-ind { font-size: 10px; color: var(--accent); }
+    tfoot td { font-weight: 700; border-top: 2px solid var(--border); border-bottom: none; }
+    .uncategorized td:first-child { color: var(--muted); font-style: italic; }
+    .empty { color: var(--muted); font-style: italic; padding: 12px 4px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Category Totals</h1>
+    <p class="subtitle">
+      Total spend per category across every receipt. Narrow it with the filters below.
+      &nbsp;<a class="back" href="/">← Back to viewer</a>
+    </p>
+
+    <div class="panel">
+      <h2>Filters</h2>
+      <div class="filters">
+        <label class="field">
+          <span>From date</span>
+          <input type="date" id="date-from" />
+        </label>
+        <label class="field">
+          <span>To date</span>
+          <input type="date" id="date-to" />
+        </label>
+        <label class="field">
+          <span>Store</span>
+          <select id="store"><option value="">All stores</option></select>
+        </label>
+        <label class="field">
+          <span>Category</span>
+          <select id="category"><option value="">All categories</option></select>
+        </label>
+      </div>
+      <div class="filter-actions">
+        <button type="button" class="reset" id="reset-btn">Reset filters</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Totals <span id="count" style="text-transform:none;letter-spacing:0;font-weight:400;"></span></h2>
+      <table id="summary-table">
+        <thead>
+          <tr>
+            <th class="sortable" data-key="category">Category<span class="sort-ind"></span></th>
+            <th class="sortable num" data-key="item_count">Items<span class="sort-ind"></span></th>
+            <th class="sortable num" data-key="total">Total<span class="sort-ind"></span></th>
+          </tr>
+        </thead>
+        <tbody id="summary-body"></tbody>
+        <tfoot id="summary-foot"></tfoot>
+      </table>
+      <div class="empty" id="empty" hidden>No line items match these filters.</div>
+    </div>
+  </div>
+
+  <script>
+    "use strict";
+
+    const fmtMoney = (v) => "$" + Number(v || 0).toFixed(2);
+
+    const dateFrom = document.getElementById("date-from");
+    const dateTo = document.getElementById("date-to");
+    const storeSel = document.getElementById("store");
+    const categorySel = document.getElementById("category");
+
+    /** Populate the store and category dropdowns from their API endpoints. */
+    async function loadFilterOptions() {
+      try {
+        const [stores, cats] = await Promise.all([
+          fetch("/api/stores").then((r) => r.json()),
+          fetch("/api/categories").then((r) => r.json()),
+        ]);
+        for (const name of stores.stores || []) {
+          storeSel.appendChild(new Option(name, name));
+        }
+        for (const name of cats.categories || []) {
+          categorySel.appendChild(new Option(name, name));
+        }
+      } catch (err) {
+        // Leave the dropdowns at their "All" defaults on failure.
+      }
+    }
+
+    /** Build the query string from the active filters (omitting blank ones). */
+    function filterQuery() {
+      const params = new URLSearchParams();
+      if (dateFrom.value) params.set("date_from", dateFrom.value);
+      if (dateTo.value) params.set("date_to", dateTo.value);
+      if (storeSel.value) params.set("store", storeSel.value);
+      if (categorySel.value) params.set("category", categorySel.value);
+      const qs = params.toString();
+      return qs ? "?" + qs : "";
+    }
+
+    // The latest summary fetched from the API, plus the current sort state.
+    let summary = { rows: [], grand_total: 0, item_count: 0 };
+    let sortKey = "total";     // "category" | "item_count" | "total"
+    let sortDir = "desc";      // "asc" | "desc"
+
+    /** Render the table from the cached summary, sorted by the active column. */
+    function render() {
+      const body = document.getElementById("summary-body");
+      const foot = document.getElementById("summary-foot");
+      const empty = document.getElementById("empty");
+      const count = document.getElementById("count");
+
+      const rows = summary.rows.slice().sort((a, b) => {
+        let cmp;
+        if (sortKey === "category") cmp = a.category.localeCompare(b.category);
+        else cmp = a[sortKey] - b[sortKey];
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+
+      empty.hidden = rows.length > 0;
+      count.textContent = `— ${summary.item_count} item${summary.item_count === 1 ? "" : "s"}`;
+
+      body.innerHTML = "";
+      for (const row of rows) {
+        const tr = document.createElement("tr");
+        if (row.category === "(uncategorized)") tr.className = "uncategorized";
+        tr.innerHTML =
+          `<td>${row.category}</td>` +
+          `<td class="num">${row.item_count}</td>` +
+          `<td class="num">${fmtMoney(row.total)}</td>`;
+        body.appendChild(tr);
+      }
+
+      foot.innerHTML = rows.length
+        ? `<tr><td>Total</td><td class="num">${summary.item_count}</td>` +
+          `<td class="num">${fmtMoney(summary.grand_total)}</td></tr>`
+        : "";
+
+      // Show the up/down indicator on the active column only.
+      document.querySelectorAll("th.sortable").forEach((th) => {
+        const ind = th.querySelector(".sort-ind");
+        ind.textContent = th.dataset.key === sortKey ? (sortDir === "asc" ? " ▲" : " ▼") : "";
+      });
+    }
+
+    /** Fetch the aggregated totals for the current filters, then render. */
+    async function refresh() {
+      try {
+        summary = await fetch("/api/summary/categories" + filterQuery()).then((r) => r.json());
+      } catch (err) {
+        document.getElementById("count").textContent = "(failed to load)";
+        return;
+      }
+      render();
+    }
+
+    // Clicking a header sorts by that column: toggling direction if it's already
+    // the active column, otherwise defaulting to ascending for the text column and
+    // descending for the numeric ones.
+    document.querySelectorAll("th.sortable").forEach((th) => {
+      th.addEventListener("click", () => {
+        const key = th.dataset.key;
+        if (key === sortKey) {
+          sortDir = sortDir === "asc" ? "desc" : "asc";
+        } else {
+          sortKey = key;
+          sortDir = key === "category" ? "asc" : "desc";
+        }
+        render();  // sort in place — no need to re-query
+      });
+    });
+
+    // Re-run the query whenever any filter changes.
+    for (const el of [dateFrom, dateTo, storeSel, categorySel]) {
+      el.addEventListener("change", refresh);
+    }
+    document.getElementById("reset-btn").addEventListener("click", () => {
+      dateFrom.value = "";
+      dateTo.value = "";
+      storeSel.value = "";
+      categorySel.value = "";
+      refresh();
+    });
+
+    // Load dropdown options, then the initial (unfiltered) totals.
+    loadFilterOptions();
+    refresh();
+  </script>
+</body>
+</html>
