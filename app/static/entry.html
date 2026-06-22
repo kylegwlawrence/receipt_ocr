@@ -60,7 +60,7 @@
     }
     input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
-    /* Store/date/total sit in a responsive two-up grid. */
+    /* Store/date/total/tax sit in a responsive two-up grid. */
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
     .grid .full { grid-column: 1 / -1; }
 
@@ -182,6 +182,10 @@
         <label class="field">
           <span>Total</span>
           <input type="number" id="total" step="0.01" min="0" inputmode="decimal" placeholder="0.00" />
+        </label>
+        <label class="field">
+          <span>Tax</span>
+          <input type="number" id="tax" step="0.01" min="0" inputmode="decimal" placeholder="0.00" />
         </label>
       </div>
     </div>
@@ -306,6 +310,20 @@
       statusEl.className = "status" + (kind ? " " + kind : "");
     }
 
+    /**
+     * Turn a FastAPI error `detail` into a readable string. A plain string is
+     * returned as-is; a 422 validation error arrives as an array of
+     * `{loc, msg}` objects (which would otherwise stringify to "[object Object]"),
+     * so join their messages instead.
+     */
+    function formatError(detail, status) {
+      if (typeof detail === "string" && detail) return detail;
+      if (Array.isArray(detail) && detail.length) {
+        return detail.map((d) => d.msg || JSON.stringify(d)).join("; ");
+      }
+      return "Save failed (" + status + ")";
+    }
+
     /** Collect non-empty line items as {description, category, value} objects. */
     function collectItems() {
       const items = [];
@@ -333,6 +351,7 @@
       form.append("merchant", merchant);
       form.append("purchased_at", document.getElementById("purchased-at").value);
       form.append("total", document.getElementById("total").value);
+      form.append("tax", document.getElementById("tax").value);
       form.append("items", JSON.stringify(items));
 
       saveBtn.disabled = true;
@@ -341,7 +360,7 @@
         const resp = await fetch("/api/receipts/manual", { method: "POST", body: form });
         const data = await resp.json().catch(() => ({}));
         if (!resp.ok) {
-          throw new Error(data.detail || ("Save failed (" + resp.status + ")"));
+          throw new Error(formatError(data.detail, resp.status));
         }
         setStatus("Saved (receipt #" + data.receipt_id + ")", "ok");
         resetForm();
@@ -360,7 +379,7 @@
       preview.hidden = true;
       previewImg.removeAttribute("src");
       previewName.textContent = "";
-      for (const id of ["merchant", "purchased-at", "total"]) {
+      for (const id of ["merchant", "purchased-at", "total", "tax"]) {
         document.getElementById(id).value = "";
       }
       resetItems();
