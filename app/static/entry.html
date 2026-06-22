@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Add a Receipt</title>
+  <style>
+    /* Shared design system, kept in sync with index.html. */
+    :root {
+      --border: #d7dbe0;
+      --header-bg: #f3f5f7;
+      --accent: #2563eb;
+      --accent-soft: #e6efff;
+      --muted: #6b7280;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 24px;
+      color: #111827;
+      background: #fafbfc;
+    }
+    /* Constrain the form to a comfortable single column on any screen. */
+    .wrap { max-width: 640px; margin: 0 auto; }
+
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    h2 { font-size: 13px; margin: 0 0 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .subtitle { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+    a.back { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600; }
+    a.back:hover { text-decoration: underline; }
+
+    .panel {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    label.field { display: block; margin-bottom: 14px; }
+    label.field:last-child { margin-bottom: 0; }
+    label.field > span { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+
+    input[type="text"], input[type="number"], input[type="date"] {
+      width: 100%; font-size: 14px; padding: 9px 11px;
+      border: 1px solid var(--border); border-radius: 6px; background: #fff; color: #111827;
+    }
+    input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+    /* Store/date/total/tax sit in a responsive two-up grid. */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+    .grid .full { grid-column: 1 / -1; }
+
+    /* Photo controls. */
+    .photo-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .preview { margin-top: 12px; }
+    .preview img { max-width: 100%; max-height: 260px; border-radius: 6px; border: 1px solid var(--border); display: block; }
+    .preview .filename { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    /* Hidden inputs are triggered by their styled buttons. */
+    input[type="file"] { display: none; }
+
+    /* Line-item table: name | value | remove. */
+    .items-head, .item-row {
+      display: grid; grid-template-columns: 1fr 130px 36px; gap: 8px; align-items: center;
+    }
+    .items-head { margin-bottom: 8px; }
+    .items-head span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .items-head span:last-child { text-align: center; }
+    .item-row { margin-bottom: 8px; }
+    .item-row input.value { text-align: right; font-variant-numeric: tabular-nums; }
+
+    button {
+      font-size: 14px; font-weight: 600; padding: 9px 16px; border-radius: 6px;
+      border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
+    }
+    button:disabled { opacity: .55; cursor: default; }
+    /* Secondary (outline) buttons: take-photo, choose-file, add-item. */
+    button.secondary { background: #fff; color: var(--accent); }
+    button.secondary:hover { background: var(--accent-soft); }
+    /* Round remove button on each line-item row. */
+    button.remove {
+      width: 32px; height: 32px; padding: 0; font-size: 18px; line-height: 1; border-radius: 6px;
+      border: 1px solid #fca5a5; background: #fff; color: #b91c1c; justify-self: center;
+    }
+    button.remove:hover { background: #fee2e2; }
+    button.add {
+      margin-top: 4px; font-size: 13px; padding: 7px 12px;
+    }
+
+    .save-row { display: flex; align-items: center; gap: 14px; }
+    .status { font-size: 13px; }
+    .status.working { color: var(--muted); }
+    .status.ok { color: #166534; }
+    .status.error { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Add a Receipt</h1>
+    <p class="subtitle">
+      Snap or upload a photo, then type in the details by hand.
+      &nbsp;<a class="back" href="/">← Back to viewer</a>
+    </p>
+
+    <!-- Photo: take a picture (mobile) or upload a file. -->
+    <div class="panel">
+      <h2>Photo</h2>
+      <div class="photo-row">
+        <button type="button" class="secondary" id="camera-btn">📷 Take photo</button>
+        <button type="button" class="secondary" id="choose-btn">Upload file</button>
+      </div>
+      <!-- capture="environment" jumps straight to the rear camera on mobile. -->
+      <input type="file" id="camera-input" accept="image/*" capture="environment" />
+      <input type="file" id="file-input" accept="image/*" />
+      <div class="preview" id="preview" hidden>
+        <img id="preview-img" alt="Receipt preview" />
+        <div class="filename" id="preview-name"></div>
+      </div>
+    </div>
+
+    <!-- Receipt-level fields. -->
+    <div class="panel">
+      <h2>Details</h2>
+      <div class="grid">
+        <label class="field full">
+          <span>Store name</span>
+          <input type="text" id="merchant" placeholder="e.g. Whole Foods" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>Date</span>
+          <input type="date" id="purchased-at" />
+        </label>
+        <label class="field">
+          <span>Total</span>
+          <input type="number" id="total" step="0.01" min="0" inputmode="decimal" placeholder="0.00" />
+        </label>
+        <label class="field">
+          <span>Tax</span>
+          <input type="number" id="tax" step="0.01" min="0" inputmode="decimal" placeholder="0.00" />
+        </label>
+      </div>
+    </div>
+
+    <!-- Variable-length list of line items. -->
+    <div class="panel">
+      <h2>Line items</h2>
+      <div class="items-head">
+        <span>Item</span>
+        <span>Value</span>
+        <span></span>
+      </div>
+      <div id="items-body"></div>
+      <button type="button" class="secondary add" id="add-item">+ Add item</button>
+    </div>
+
+    <div class="panel save-row">
+      <button type="button" id="save-btn">Save receipt</button>
+      <span class="status" id="status"></span>
+    </div>
+  </div>
+
+  <script>
+    "use strict";
+
+    // The chosen photo, updated whenever either file input changes.
+    let selectedFile = null;
+
+    const cameraInput = document.getElementById("camera-input");
+    const fileInput = document.getElementById("file-input");
+    const preview = document.getElementById("preview");
+    const previewImg = document.getElementById("preview-img");
+    const previewName = document.getElementById("preview-name");
+    const itemsBody = document.getElementById("items-body");
+    const statusEl = document.getElementById("status");
+    const saveBtn = document.getElementById("save-btn");
+
+    // Wire the styled buttons to their (hidden) native file inputs.
+    document.getElementById("camera-btn").addEventListener("click", () => cameraInput.click());
+    document.getElementById("choose-btn").addEventListener("click", () => fileInput.click());
+    cameraInput.addEventListener("change", onPhotoChosen);
+    fileInput.addEventListener("change", onPhotoChosen);
+
+    /** Show a preview of the picked photo and remember it for submission. */
+    function onPhotoChosen(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      selectedFile = file;
+      previewName.textContent = file.name;
+      // HEIC photos can't be rendered by browsers; hide the broken <img> and
+      // fall back to just the filename if the preview fails to load.
+      const url = URL.createObjectURL(file);
+      previewImg.src = url;
+      previewImg.hidden = false;
+      previewImg.onerror = () => { previewImg.hidden = true; };
+      previewImg.onload = () => URL.revokeObjectURL(url);
+      preview.hidden = false;
+    }
+
+    /** Append a blank line-item row (name + value + remove button). */
+    function addItemRow(name = "", value = "") {
+      const row = document.createElement("div");
+      row.className = "item-row";
+
+      const nameInput = document.createElement("input");
+      nameInput.type = "text";
+      nameInput.className = "name";
+      nameInput.placeholder = "Item name";
+      nameInput.autocomplete = "off";
+      nameInput.value = name;
+
+      const valueInput = document.createElement("input");
+      valueInput.type = "number";
+      valueInput.className = "value";
+      valueInput.step = "0.01";
+      valueInput.min = "0";
+      valueInput.inputMode = "decimal";
+      valueInput.placeholder = "0.00";
+      valueInput.value = value;
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "remove";
+      removeBtn.textContent = "×";
+      removeBtn.title = "Remove item";
+      removeBtn.addEventListener("click", () => row.remove());
+
+      row.append(nameInput, valueInput, removeBtn);
+      itemsBody.appendChild(row);
+    }
+
+    /** Reset the line-item list to three empty rows. */
+    function resetItems() {
+      itemsBody.innerHTML = "";
+      for (let i = 0; i < 3; i++) addItemRow();
+    }
+
+    document.getElementById("add-item").addEventListener("click", () => addItemRow());
+
+    function setStatus(message, kind) {
+      statusEl.textContent = message;
+      statusEl.className = "status" + (kind ? " " + kind : "");
+    }
+
+    /** Collect non-empty line items as {description, value} objects. */
+    function collectItems() {
+      const items = [];
+      for (const row of itemsBody.querySelectorAll(".item-row")) {
+        const description = row.querySelector(".name").value.trim();
+        const value = row.querySelector(".value").value.trim();
+        if (description) items.push({ description, value });
+      }
+      return items;
+    }
+
+    saveBtn.addEventListener("click", async () => {
+      const merchant = document.getElementById("merchant").value.trim();
+      const items = collectItems();
+
+      // Client-side validation mirrors the server's required fields.
+      if (!selectedFile) { setStatus("Please add a photo first.", "error"); return; }
+      if (!merchant) { setStatus("Please enter a store name.", "error"); return; }
+      if (items.length === 0) { setStatus("Please add at least one line item.", "error"); return; }
+
+      const form = new FormData();
+      form.append("file", selectedFile);
+      form.append("merchant", merchant);
+      form.append("purchased_at", document.getElementById("purchased-at").value);
+      form.append("total", document.getElementById("total").value);
+      form.append("tax", document.getElementById("tax").value);
+      form.append("items", JSON.stringify(items));
+
+      saveBtn.disabled = true;
+      setStatus("Saving…", "working");
+      try {
+        const resp = await fetch("/api/receipts/manual", { method: "POST", body: form });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          throw new Error(data.detail || ("Save failed (" + resp.status + ")"));
+        }
+        setStatus("Saved ✓ (receipt #" + data.receipt_id + ")", "ok");
+        resetForm();
+      } catch (err) {
+        setStatus(err.message || "Save failed.", "error");
+      } finally {
+        saveBtn.disabled = false;
+      }
+    });
+
+    /** Clear every field after a successful save, ready for the next receipt. */
+    function resetForm() {
+      selectedFile = null;
+      cameraInput.value = "";
+      fileInput.value = "";
+      preview.hidden = true;
+      previewImg.removeAttribute("src");
+      previewName.textContent = "";
+      for (const id of ["merchant", "purchased-at", "total", "tax"]) {
+        document.getElementById(id).value = "";
+      }
+      resetItems();
+    }
+
+    // Start with three blank line-item rows.
+    resetItems();
+  </script>
+</body>
+</html>

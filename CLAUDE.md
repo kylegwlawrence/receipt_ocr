@@ -11,8 +11,9 @@ Receipt OCR: read data from photos of receipts using a local vision model, trans
 > (orchestration), `cli.py` (CLI entry point), `config.py` (default settings), `db.py`
 > (SQLite engine/session helpers), `models.py` (SQLModel ORM tables), and `schemas.py`
 > (Pydantic extraction schemas). Exposed as a CLI via `python -m app <image>` and as a FastAPI
-> web app (`web.py` + `static/index.html`) for uploading and browsing receipts. Tests live
-> under `tests/`. Keep this file updated as the architecture evolves.
+> web app (`web.py` + `static/index.html` viewer + `static/entry.html` manual-entry page) for
+> uploading, browsing, and hand-annotating receipts. Tests live under `tests/`. Keep this file
+> updated as the architecture evolves.
 
 ## Intended pipeline architecture
 
@@ -24,11 +25,14 @@ A linear ingestion pipeline; each stage hands off to the next. Keep the stages a
 4. **Loading** — write the tabular data to the database and verify the write succeeded.
 
 The web app (`app/web.py`) is a thin FastAPI layer over this pipeline: it reuses `run_pipeline`
-for uploads and serves a read-only viewer (`app/static/index.html`) plus a small JSON API.
-Endpoints: `GET /api/models` (installed vision-capable Ollama models + default),
-`GET /api/receipts`, `GET /api/receipts/{id}/items`, `GET /api/receipts/{id}/image`,
-`POST /api/receipts` (upload + run pipeline), `DELETE /api/receipts/{id}` (delete DB rows;
-the photo on disk is kept). Uploaded photos are saved to `images/` (gitignored).
+for uploads, serves a read-only viewer (`app/static/index.html`), and serves a manual
+receipt-entry page (`app/static/entry.html`) for hand-annotating receipts. Endpoints:
+`GET /api/models` (installed vision-capable Ollama models + default), `GET /api/receipts`,
+`GET /api/receipts/{id}/items`, `GET /api/receipts/{id}/image`, `POST /api/receipts`
+(upload + run pipeline), `POST /api/receipts/manual` (save a photo + hand-typed fields,
+skipping the model; reuses `loading.persist`, stored as `verified` and tagged
+`model="manual-entry"`), `DELETE /api/receipts/{id}` (delete DB rows; the photo on disk is
+kept). Uploaded photos are saved to `images/` (gitignored).
 
 Out of scope for now: an analytics dashboard and RAG retrieval. (An earlier draft listed web
 ingestion as out of scope; that's now implemented via the web app above.)

@@ -17,8 +17,10 @@ be overridden with the ``RECEIPTS_DB_PATH`` environment variable.
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
+from datetime import date
 from pathlib import Path
 from uuid import uuid4
 
@@ -29,8 +31,10 @@ from sqlmodel import select
 
 from app.config import settings
 from app.db import get_session, init_db, make_engine
-from app.ingestion import IMAGE_EXTENSIONS
-from app.models import LineItem, Receipt
+from app.ingestion import IMAGE_EXTENSIONS, ingest
+from app.loading import persist
+from app.models import LineItem, Receipt, ReceiptStatus
+from app.parsing import ParsedLineItem, ParsedReceipt
 from app.pipeline import run_pipeline
 
 logger = logging.getLogger("app")
@@ -258,6 +262,156 @@ async def upload_receipt(
         "status": result.receipt_status.value if result.receipt_status else None,
         "review_reason": result.review_reason,
     }
+
+
+def _parse_money(value: str | int | float | None) -> float | None:
+    """Parse an optional money value into a rounded float (or None).
+
+    Accepts both the form's string amounts (``total``/``tax``) and the JSON line
+    items' values, which may arrive as strings or numbers.
+
+    Args:
+        value: The raw value (may be None, blank, a numeric string, or a number).
+
+    Returns:
+        ``None`` for a missing/blank value, otherwise the amount rounded to 2
+        decimal places (matching the parsing stage's convention).
+
+    Raises:
+        HTTPException: 400 if the value is present but not a valid number.
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    if text == "":
+        return None
+    try:
+        return round(float(text), 2)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid number: '{value}'") from exc
+
+
+def _parse_date(value: str | None) -> date | None:
+    """Parse an optional ``YYYY-MM-DD`` string from a form into a date (or None).
+
+    Raises:
+        HTTPException: 400 if the value is present but not an ISO date.
+    """
+    if value is None or value.strip() == "":
+        return None
+    try:
+        return date.fromisoformat(value.strip())
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid date: '{value}' (expected YYYY-MM-DD)",
+        ) from exc
+
+
+@app.post("/api/receipts/manual", status_code=201)
+async def create_manual_receipt(
+    file: UploadFile = File(...),
+    merchant: str = Form(...),
+    purchased_at: str | None = Form(None),
+    total: str | None = Form(None),
+    tax: str | None = Form(None),
+    items: str = Form("[]"),
+) -> dict:
+    """Persist a hand-entered receipt (photo + typed fields), skipping the model.
+
+    This is the manual-annotation counterpart to :func:`upload_receipt`. Instead
+    of running the vision pipeline, it builds a :class:`~app.parsing.ParsedReceipt`
+    directly from the submitted form and stores it as VERIFIED ground truth tagged
+    with the model name ``"manual-entry"`` (so manual records are distinguishable
+    from model extractions). The photo is saved and, if HEIC/HEIF, transcoded to
+    PNG via :func:`app.ingestion.ingest` — just like the pipeline — so the viewer's
+    image endpoint can display it.
+
+    Args:
+        file: The required receipt photo.
+        merchant: Store name (required, non-blank).
+        purchased_at: Purchase date as ``YYYY-MM-DD`` (optional).
+        total: Receipt total as a money string (optional).
+        tax: Tax amount as a money string (optional).
+        items: A JSON array of ``{"description": str, "value": str}`` line items.
+            Rows with a blank description are dropped.
+
+    Returns:
+        A dict: ``{"outcome": "loaded", "receipt_id": int, "merchant": str}``.
+
+    Raises:
+        HTTPException: 400 for an unsupported image, a blank store name, malformed
+            numbers/date, or invalid items JSON; 500 if the write fails.
+    """
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in IMAGE_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported image type '{suffix or file.filename}'. "
+                f"Expected one of: {sorted(IMAGE_EXTENSIONS)}"
+            ),
+        )
+
+    if not merchant.strip():
+        raise HTTPException(status_code=400, detail="Store name is required.")
+
+    # Decode and validate the form payload up front so a malformed request fails
+    # before we write anything to disk.
+    try:
+        raw_items = json.loads(items)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid items JSON: {exc}") from exc
+    if not isinstance(raw_items, list):
+        raise HTTPException(status_code=400, detail="items must be a JSON array.")
+
+    line_items = [
+        ParsedLineItem(
+            description=str(row.get("description", "")).strip(),
+            quantity=None,
+            unit_price=None,
+            line_total=_parse_money(row.get("value")),
+            status=ReceiptStatus.VERIFIED,
+        )
+        for row in raw_items
+        if isinstance(row, dict) and str(row.get("description", "")).strip()
+    ]
+
+    parsed = ParsedReceipt(
+        merchant=merchant.strip(),
+        purchased_at=_parse_date(purchased_at),
+        subtotal=None,
+        tax=_parse_money(tax),
+        tip=None,
+        total=_parse_money(total),
+        line_items=line_items,
+        status=ReceiptStatus.VERIFIED,
+        review_reason=None,
+    )
+
+    # Save the photo under a collision-proof name (same scheme as upload_receipt),
+    # then ingest it to hash and, for HEIC/HEIF, transcode to a viewer-readable PNG.
+    IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+    stem = Path(file.filename or "receipt").stem
+    dest = IMAGES_DIR / f"{stem}_{uuid4().hex[:8]}{suffix}"
+    dest.write_bytes(await file.read())
+    try:
+        ingested = ingest(dest)
+        relative_path = ingested.path.relative_to(PROJECT_ROOT)
+        with get_session(engine) as session:
+            receipt_id = persist(
+                session, parsed, str(relative_path), ingested.sha256, model="manual-entry"
+            )
+    except HTTPException:
+        dest.unlink(missing_ok=True)
+        dest.with_suffix(".png").unlink(missing_ok=True)
+        raise
+    except Exception as exc:  # noqa: BLE001 - clean up the orphaned file on any failure
+        dest.unlink(missing_ok=True)
+        dest.with_suffix(".png").unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail=f"Could not save receipt: {exc}") from exc
+
+    return {"outcome": "loaded", "receipt_id": receipt_id, "merchant": merchant.strip()}
 
 
 @app.delete("/api/receipts/{receipt_id}")
