@@ -37,7 +37,7 @@ There's also a manual-entry page at `/entry.html` for hand-typing a receipt's
 fields alongside its photo, skipping the model entirely (records are stored as
 `verified` and tagged `model="manual-entry"`).
 
-Uploaded photos are saved under `images/` (gitignored). The database path defaults to
+Uploaded photos are saved under `data/images/` (gitignored). The database path defaults to
 `data/receipts.db` and can be overridden with the `RECEIPTS_DB_PATH` environment variable.
 
 ## Serving on the Tailscale network

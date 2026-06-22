@@ -40,13 +40,13 @@ from app.pipeline import run_pipeline
 logger = logging.getLogger("app")
 
 # Project root (the directory that holds the ``app`` package). Relative paths in
-# the database (e.g. "images/receipt1.jpg") and the configured DB path are
+# the database (e.g. "data/images/receipt1.jpg") and the configured DB path are
 # resolved against this so the server works regardless of the caller's CWD.
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-# Uploaded photos are written here (gitignored) so the viewer's image endpoint
-# can serve them later, just like images ingested via the CLI.
-IMAGES_DIR = PROJECT_ROOT / "images"
+# Uploaded photos are written here (gitignored, under data/) so the viewer's
+# image endpoint can serve them later, just like images ingested via the CLI.
+IMAGES_DIR = PROJECT_ROOT / "data" / "images"
 
 
 def _resolve(path_str: str) -> Path:
@@ -216,10 +216,10 @@ async def upload_receipt(
 ) -> dict:
     """Accept a receipt photo, run the pipeline on it, and return the outcome.
 
-    The uploaded file is saved into the ``images/`` folder under a collision-proof
+    The uploaded file is saved into the ``data/images/`` folder under a collision-proof
     name, then handed to :func:`app.pipeline.run_pipeline` synchronously (the local
     vision model takes a few seconds). On an error the saved file is removed so
-    ``images/`` only ever holds photos referenced by the database.
+    ``data/images/`` only ever holds photos referenced by the database.
 
     Args:
         file: The multipart-uploaded image (jpg/png/webp/heic/...).

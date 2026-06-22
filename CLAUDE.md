@@ -33,7 +33,7 @@ receipt-entry page (`app/static/entry.html`) for hand-annotating receipts. Endpo
 `POST /api/receipts` (upload + run pipeline), `POST /api/receipts/manual` (save a photo +
 hand-typed fields, skipping the model; reuses `loading.persist`, stored as `verified` and
 tagged `model="manual-entry"`), `DELETE /api/receipts/{id}` (delete DB rows; the photo on disk
-is kept). Uploaded photos are saved to `images/` (gitignored).
+is kept). Uploaded photos are saved to `data/images/` (gitignored).
 
 Line items carry an optional `category` (a `LineItem.category` column). It's hand-assigned via a
 per-row dropdown on the manual-entry page, constrained to the fixed `config.ITEM_CATEGORIES`

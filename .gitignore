@@ -6,7 +6,7 @@ __pycache__/
 *.db
 *.sqlite3
 data/
-images/
+data/images/
 /docs/
 
 # Environment variables
