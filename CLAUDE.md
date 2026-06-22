@@ -53,6 +53,7 @@ ingestion as out of scope; that's now implemented via the web app above.)
 - Test: `pytest` (unit tests, model mocked); `pytest -m integration` for the real-model test
 - Run (CLI): `python -m app <image>` (options: `--db-path`, `--model`, `--verbose`)
 - Run (web): `uvicorn app.web:app --port 8005 --reload` (or `python -m app.web`), then open http://127.0.0.1:8005
+- Serve on the tailnet: `./serve.sh` runs the app in a detached tmux session named `receipt_ocr` (subcommands: `attach`/`stop`/`status`). It calls `run_server.sh`, which binds this machine's Tailscale IP only (resolved via `tailscale ip -4`, fallback `100.117.77.103`). `python -m app.web` reads `RECEIPTS_HOST` (default `127.0.0.1`), `RECEIPTS_PORT` (default `8005`), and `RECEIPTS_RELOAD` (default off). No auth — keep it on the tailnet, not `0.0.0.0` on untrusted networks.
 
 No lint or build tooling is configured yet.
 

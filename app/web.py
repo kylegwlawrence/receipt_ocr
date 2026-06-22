@@ -449,10 +449,24 @@ app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 
 
 def main() -> None:  # pragma: no cover - convenience runner
-    """Run the dev server via ``python -m app.web``."""
+    """Run the server via ``python -m app.web``.
+
+    Host, port, and auto-reload are read from environment variables so the same
+    entry point serves both local development and a network deployment:
+
+    * ``RECEIPTS_HOST`` — interface to bind (default ``127.0.0.1``, localhost only).
+      Set to a Tailscale IP to expose the app only over Tailscale, or ``0.0.0.0``
+      to bind every interface.
+    * ``RECEIPTS_PORT`` — TCP port (default ``8005``).
+    * ``RECEIPTS_RELOAD`` — set to ``1``/``true``/``yes`` to enable auto-reload
+      (handy in development, off by default for a long-running server).
+    """
     import uvicorn
 
-    uvicorn.run("app.web:app", host="127.0.0.1", port=8005, reload=True)
+    host = os.environ.get("RECEIPTS_HOST", "127.0.0.1")
+    port = int(os.environ.get("RECEIPTS_PORT", "8005"))
+    reload = os.environ.get("RECEIPTS_RELOAD", "").strip().lower() in {"1", "true", "yes"}
+    uvicorn.run("app.web:app", host=host, port=port, reload=reload)
 
 
 if __name__ == "__main__":  # pragma: no cover

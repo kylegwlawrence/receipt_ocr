@@ -34,6 +34,34 @@ Then open http://127.0.0.1:8005. From the page you can:
 Uploaded photos are saved under `images/` (gitignored). The database path defaults to
 `data/receipts.db` and can be overridden with the `RECEIPTS_DB_PATH` environment variable.
 
+## Serving on the Tailscale network
+
+To run the app on this machine and reach it from other devices on the tailnet
+(e.g. `pi6` / `100.117.77.103`), use the helper scripts:
+
+```bash
+./serve.sh            # start the server in a detached tmux session
+./serve.sh attach     # attach to the session (Ctrl-b d to detach)
+./serve.sh status     # check whether it's running
+./serve.sh stop       # stop it and kill the session
+```
+
+Then open `http://pi6:8005` (or `http://100.117.77.103:8005`) from any tailnet device.
+
+By default the server binds **only** the Tailscale IP, so it's reachable over
+Tailscale but not exposed on the local LAN/Wi-Fi. Override the host/port with
+environment variables (read by `python -m app.web`):
+
+- `RECEIPTS_HOST` — interface to bind (default: localhost for `python -m app.web`;
+  `run_server.sh` sets it to this machine's Tailscale IP). Use `0.0.0.0` to bind
+  every interface.
+- `RECEIPTS_PORT` — port (default `8005`).
+- `RECEIPTS_RELOAD` — set to `1` to enable auto-reload (development only).
+
+`run_server.sh` launches the foreground server (resolving the Tailscale IP via
+`tailscale ip -4`); `serve.sh` wraps it in tmux. There is no authentication, so
+keep it on the tailnet rather than binding `0.0.0.0` on an untrusted network.
+
 ### Web API
 - `GET  /api/models` — installed vision-capable Ollama models + the configured default
 - `GET  /api/receipts` — all receipt header rows (newest first)
