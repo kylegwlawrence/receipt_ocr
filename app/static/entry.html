@@ -107,7 +107,7 @@
     <div class="panel">
       <h2>Photo</h2>
       <div class="photo-row">
-        <button type="button" class="secondary" id="camera-btn">📷 Take photo</button>
+        <button type="button" class="secondary" id="camera-btn">Take photo</button>
         <button type="button" class="secondary" id="choose-btn">Upload file</button>
       </div>
       <!-- capture="environment" jumps straight to the rear camera on mobile. -->
@@ -299,7 +299,7 @@
         if (!resp.ok) {
           throw new Error(data.detail || ("Save failed (" + resp.status + ")"));
         }
-        setStatus("Saved ✓ (receipt #" + data.receipt_id + ")", "ok");
+        setStatus("Saved (receipt #" + data.receipt_id + ")", "ok");
         resetForm();
       } catch (err) {
         setStatus(err.message || "Save failed.", "error");
