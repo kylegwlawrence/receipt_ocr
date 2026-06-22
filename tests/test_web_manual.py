@@ -118,6 +118,35 @@ def test_manual_entry_allows_blank_optional_fields(tmp_path, monkeypatch):
         assert receipt.line_items[0].line_total is None
 
 
+def test_manual_entry_without_photo(tmp_path, monkeypatch):
+    _setup(tmp_path, monkeypatch)
+
+    # No photo (FastAPI resolves a missing optional upload to None): the endpoint
+    # stores the receipt with empty image provenance and never creates the images
+    # directory.
+    result = _call(
+        file=None,
+        merchant="No Photo Mart",
+        purchased_at="",
+        total="5.00",
+        tax=None,
+        items=json.dumps([{"description": "Soap", "value": "5.00"}]),
+    )
+
+    assert result["outcome"] == "loaded"
+    with get_session(web.engine) as session:
+        receipt = session.get(Receipt, result["receipt_id"])
+        assert receipt.merchant == "No Photo Mart"
+        assert receipt.status == ReceiptStatus.VERIFIED
+        assert receipt.source_image_path == ""
+        assert receipt.image_sha256 == ""
+        assert [li.description for li in receipt.line_items] == ["Soap"]
+
+    # A photoless entry leaves no files behind.
+    images_dir = tmp_path / "images"
+    assert not images_dir.exists() or not any(images_dir.iterdir())
+
+
 def test_manual_entry_rejects_unsupported_image(tmp_path, monkeypatch):
     _setup(tmp_path, monkeypatch)
     with pytest.raises(HTTPException) as exc:

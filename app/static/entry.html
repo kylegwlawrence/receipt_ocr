@@ -60,7 +60,7 @@
     }
     input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
-    /* Store/date/total/tax sit in a responsive two-up grid. */
+    /* Store/date/total sit in a responsive two-up grid. */
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
     .grid .full { grid-column: 1 / -1; }
 
@@ -148,12 +148,12 @@
   <div class="wrap">
     <h1>Add a Receipt</h1>
     <p class="subtitle">
-      Snap or upload a photo, then type in the details by hand.
+      Type in the details by hand. A photo is optional.
     </p>
 
-    <!-- Photo: take a picture (mobile) or upload a file. -->
+    <!-- Photo: take a picture (mobile) or upload a file. Optional. -->
     <div class="panel">
-      <h2>Photo</h2>
+      <h2>Photo (optional)</h2>
       <div class="photo-row">
         <button type="button" class="secondary" id="camera-btn">Take photo</button>
         <button type="button" class="secondary" id="choose-btn">Upload file</button>
@@ -182,10 +182,6 @@
         <label class="field">
           <span>Total</span>
           <input type="number" id="total" step="0.01" min="0" inputmode="decimal" placeholder="0.00" />
-        </label>
-        <label class="field">
-          <span>Tax</span>
-          <input type="number" id="tax" step="0.01" min="0" inputmode="decimal" placeholder="0.00" />
         </label>
       </div>
     </div>
@@ -326,17 +322,17 @@
       const merchant = document.getElementById("merchant").value.trim();
       const items = collectItems();
 
-      // Client-side validation mirrors the server's required fields.
-      if (!selectedFile) { setStatus("Please add a photo first.", "error"); return; }
+      // Client-side validation mirrors the server's required fields. The photo
+      // is optional, so it isn't checked here.
       if (!merchant) { setStatus("Please enter a store name.", "error"); return; }
       if (items.length === 0) { setStatus("Please add at least one line item.", "error"); return; }
 
       const form = new FormData();
-      form.append("file", selectedFile);
+      // Only attach a photo if one was chosen; the endpoint accepts none.
+      if (selectedFile) form.append("file", selectedFile);
       form.append("merchant", merchant);
       form.append("purchased_at", document.getElementById("purchased-at").value);
       form.append("total", document.getElementById("total").value);
-      form.append("tax", document.getElementById("tax").value);
       form.append("items", JSON.stringify(items));
 
       saveBtn.disabled = true;
@@ -364,7 +360,7 @@
       preview.hidden = true;
       previewImg.removeAttribute("src");
       previewName.textContent = "";
-      for (const id of ["merchant", "purchased-at", "total", "tax"]) {
+      for (const id of ["merchant", "purchased-at", "total"]) {
         document.getElementById(id).value = "";
       }
       resetItems();

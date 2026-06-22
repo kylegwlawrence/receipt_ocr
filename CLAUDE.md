@@ -30,9 +30,10 @@ receipt-entry page (`app/static/entry.html`) for hand-annotating receipts. Endpo
 `GET /api/models` (installed vision-capable Ollama models + default),
 `GET /api/categories` (the fixed line-item category list, from `config.ITEM_CATEGORIES`),
 `GET /api/receipts`, `GET /api/receipts/{id}/items`, `GET /api/receipts/{id}/image`,
-`POST /api/receipts` (upload + run pipeline), `POST /api/receipts/manual` (save a photo +
-hand-typed fields, skipping the model; reuses `loading.persist`, stored as `verified` and
-tagged `model="manual-entry"`), `DELETE /api/receipts/{id}` (delete DB rows; the photo on disk
+`POST /api/receipts` (upload + run pipeline), `POST /api/receipts/manual` (save hand-typed
+fields with an optional photo, skipping the model; reuses `loading.persist`, stored as
+`verified` and tagged `model="manual-entry"`; a photoless entry is stored with empty image
+provenance), `DELETE /api/receipts/{id}` (delete DB rows; the photo on disk
 is kept). Uploaded photos are saved to `data/images/` (gitignored).
 
 Line items carry an optional `category` (a `LineItem.category` column). It's hand-assigned via a

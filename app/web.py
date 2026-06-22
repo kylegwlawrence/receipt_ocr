@@ -430,29 +430,31 @@ def _parse_date(value: str | None) -> date | None:
 
 @app.post("/api/receipts/manual", status_code=201)
 async def create_manual_receipt(
-    file: UploadFile = File(...),
+    file: UploadFile | None = File(None),
     merchant: str = Form(...),
     purchased_at: str | None = Form(None),
     total: str | None = Form(None),
     tax: str | None = Form(None),
     items: str = Form("[]"),
 ) -> dict:
-    """Persist a hand-entered receipt (photo + typed fields), skipping the model.
+    """Persist a hand-entered receipt (typed fields, optional photo), skipping the model.
 
     This is the manual-annotation counterpart to :func:`upload_receipt`. Instead
     of running the vision pipeline, it builds a :class:`~app.parsing.ParsedReceipt`
     directly from the submitted form and stores it as VERIFIED ground truth tagged
     with the model name ``"manual-entry"`` (so manual records are distinguishable
-    from model extractions). The photo is saved and, if HEIC/HEIF, transcoded to
-    PNG via :func:`app.ingestion.ingest` — just like the pipeline — so the viewer's
-    image endpoint can display it.
+    from model extractions). A photo is optional; when one is supplied it is saved
+    and, if HEIC/HEIF, transcoded to PNG via :func:`app.ingestion.ingest` — just like
+    the pipeline — so the viewer's image endpoint can display it. When no photo is
+    supplied the receipt is stored with empty image provenance.
 
     Args:
-        file: The required receipt photo.
+        file: An optional receipt photo. May be omitted entirely for a photoless
+            hand-entered receipt.
         merchant: Store name (required, non-blank).
         purchased_at: Purchase date as ``YYYY-MM-DD`` (optional).
         total: Receipt total as a money string (optional).
-        tax: Tax amount as a money string (optional).
+        tax: Tax amount as a money string (optional; not sent by the entry page).
         items: A JSON array of ``{"description": str, "category": str, "value": str}``
             line items. ``category`` is optional but, when present, must be one of
             :data:`app.config.settings.item_categories`. Rows with a blank
@@ -466,8 +468,11 @@ async def create_manual_receipt(
             numbers/date, an unknown category, or invalid items JSON; 500 if the
             write fails.
     """
-    suffix = Path(file.filename or "").suffix.lower()
-    if suffix not in IMAGE_EXTENSIONS:
+    # A photo is optional. Treat a missing file (or one with no filename, which is
+    # how an empty multipart field arrives) as "no photo".
+    has_photo = file is not None and bool(file.filename)
+    suffix = Path(file.filename or "").suffix.lower() if has_photo else ""
+    if has_photo and suffix not in IMAGE_EXTENSIONS:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -513,26 +518,37 @@ async def create_manual_receipt(
         review_reason=None,
     )
 
-    # Save the photo under a collision-proof name (same scheme as upload_receipt),
-    # then ingest it to hash and, for HEIC/HEIF, transcode to a viewer-readable PNG.
-    IMAGES_DIR.mkdir(parents=True, exist_ok=True)
-    stem = Path(file.filename or "receipt").stem
-    dest = IMAGES_DIR / f"{stem}_{uuid4().hex[:8]}{suffix}"
-    dest.write_bytes(await file.read())
+    # When a photo is supplied, save it under a collision-proof name (same scheme as
+    # upload_receipt). Otherwise the receipt is stored with empty image provenance.
+    dest: Path | None = None
+    if has_photo:
+        IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+        stem = Path(file.filename or "receipt").stem
+        dest = IMAGES_DIR / f"{stem}_{uuid4().hex[:8]}{suffix}"
+        dest.write_bytes(await file.read())
+
+    source_image_path = ""
+    image_sha256 = ""
     try:
-        ingested = ingest(dest)
-        relative_path = ingested.path.relative_to(PROJECT_ROOT)
+        # Ingest a supplied photo to hash it and, for HEIC/HEIF, transcode to a
+        # viewer-readable PNG.
+        if dest is not None:
+            ingested = ingest(dest)
+            source_image_path = str(ingested.path.relative_to(PROJECT_ROOT))
+            image_sha256 = ingested.sha256
         with get_session(engine) as session:
             receipt_id = persist(
-                session, parsed, str(relative_path), ingested.sha256, model="manual-entry"
+                session, parsed, source_image_path, image_sha256, model="manual-entry"
             )
     except HTTPException:
-        dest.unlink(missing_ok=True)
-        dest.with_suffix(".png").unlink(missing_ok=True)
+        if dest is not None:
+            dest.unlink(missing_ok=True)
+            dest.with_suffix(".png").unlink(missing_ok=True)
         raise
     except Exception as exc:  # noqa: BLE001 - clean up the orphaned file on any failure
-        dest.unlink(missing_ok=True)
-        dest.with_suffix(".png").unlink(missing_ok=True)
+        if dest is not None:
+            dest.unlink(missing_ok=True)
+            dest.with_suffix(".png").unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail=f"Could not save receipt: {exc}") from exc
 
     return {"outcome": "loaded", "receipt_id": receipt_id, "merchant": merchant.strip()}
