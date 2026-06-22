@@ -52,6 +52,10 @@ class LineItem(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
     receipt_id: int | None = Field(default=None, foreign_key="receipt.id")
     description: str
+    # Optional grocery category (e.g. "dairy"), assigned by hand on the manual-entry
+    # page. Constrained to app.config.ITEM_CATEGORIES at the web layer; null when
+    # unset or for model-extracted receipts, which don't categorize items.
+    category: str | None = None
     quantity: float | None = None
     unit_price: float | None = None
     line_total: float | None = None

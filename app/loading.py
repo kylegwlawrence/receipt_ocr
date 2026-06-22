@@ -40,6 +40,7 @@ def to_models(
         line_items=[
             LineItem(
                 description=li.description,
+                category=li.category,
                 quantity=li.quantity,
                 unit_price=li.unit_price,
                 line_total=li.line_total,
