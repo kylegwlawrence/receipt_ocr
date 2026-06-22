@@ -20,6 +20,21 @@
       color: #111827;
       background: #fafbfc;
     }
+
+    /* Shared top navigation bar. Negative margins let it span the full width
+       above the body's 24px padding. Kept in sync across all pages. */
+    .topnav {
+      display: flex; gap: 4px;
+      margin: -24px -24px 24px; padding: 0 24px;
+      background: #fff; border-bottom: 1px solid var(--border);
+    }
+    .topnav a {
+      padding: 14px 16px; font-size: 14px; font-weight: 600;
+      color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent;
+    }
+    .topnav a:hover { color: #111827; }
+    .topnav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+
     h1 { font-size: 20px; margin: 0 0 4px; }
     h2 { font-size: 15px; margin: 0 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
     .subtitle { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
@@ -101,14 +116,15 @@
       font-size: 13px; padding: 7px 10px; border-radius: 6px;
       border: 1px solid var(--border); background: #fff; color: #111827; cursor: pointer;
     }
-
-    /* Link to the manual-entry page. */
-    .manual-link { margin: 12px 0 0; font-size: 13px; }
-    .manual-link a { color: var(--accent); text-decoration: none; font-weight: 600; }
-    .manual-link a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
+  <nav class="topnav">
+    <a href="/" class="active">Receipts</a>
+    <a href="/entry.html">Add Receipt</a>
+    <a href="/summary.html">Category Totals</a>
+  </nav>
+
   <h1>Receipt OCR Viewer</h1>
   <p class="subtitle">Type in any column header to filter. Click a receipt to see its items and photo.</p>
 
@@ -123,10 +139,6 @@
         <select id="model-select"></select>
       </span>
     </div>
-    <p class="manual-link">
-      <a href="/entry.html">Or enter a receipt manually →</a>
-      &nbsp;&nbsp;<a href="/summary.html">View category totals →</a>
-    </p>
   </div>
 
   <div class="panel">

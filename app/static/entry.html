@@ -24,11 +24,23 @@
     /* Constrain the form to a comfortable single column on any screen. */
     .wrap { max-width: 640px; margin: 0 auto; }
 
+    /* Shared top navigation bar. Negative margins let it span the full width
+       above the body's 24px padding. Kept in sync across all pages. */
+    .topnav {
+      display: flex; gap: 4px;
+      margin: -24px -24px 24px; padding: 0 24px;
+      background: #fff; border-bottom: 1px solid var(--border);
+    }
+    .topnav a {
+      padding: 14px 16px; font-size: 14px; font-weight: 600;
+      color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent;
+    }
+    .topnav a:hover { color: #111827; }
+    .topnav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+
     h1 { font-size: 20px; margin: 0 0 4px; }
     h2 { font-size: 13px; margin: 0 0 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
     .subtitle { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
-    a.back { color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 600; }
-    a.back:hover { text-decoration: underline; }
 
     .panel {
       background: #fff;
@@ -96,11 +108,16 @@
   </style>
 </head>
 <body>
+  <nav class="topnav">
+    <a href="/">Receipts</a>
+    <a href="/entry.html" class="active">Add Receipt</a>
+    <a href="/summary.html">Category Totals</a>
+  </nav>
+
   <div class="wrap">
     <h1>Add a Receipt</h1>
     <p class="subtitle">
       Snap or upload a photo, then type in the details by hand.
-      &nbsp;<a class="back" href="/">← Back to viewer</a>
     </p>
 
     <!-- Photo: take a picture (mobile) or upload a file. -->
